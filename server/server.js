@@ -98,7 +98,13 @@ app.post('/send', async (req, res) => {
       const phone = formatPhone(contact.phone);
       const message = buildMessage(contact);
 
-      await client.sendMessage(`${phone}@c.us`, message);
+      // Resolve the correct WhatsApp ID (handles both @c.us and @lid accounts)
+      const numberId = await client.getNumberId(phone);
+      if (!numberId) {
+        throw new Error(`Número ${contact.phone} não encontrado no WhatsApp`);
+      }
+
+      await client.sendMessage(numberId._serialized, message);
 
       results.push({ name: contact.name, phone: contact.phone, success: true });
       console.log(`✅ Mensagem enviada para ${contact.name} (${contact.phone})`);
