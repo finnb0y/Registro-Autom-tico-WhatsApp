@@ -85,7 +85,7 @@ app.post('/send', async (req, res) => {
     return res.status(400).json({ error: 'WhatsApp não está conectado' });
   }
 
-  const { contacts } = req.body;
+  const { contacts, template } = req.body;
 
   if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
     return res.status(400).json({ error: 'Nenhum contato fornecido' });
@@ -96,7 +96,7 @@ app.post('/send', async (req, res) => {
   for (const contact of contacts) {
     try {
       const phone = formatPhone(contact.phone);
-      const message = buildMessage(contact);
+      const message = template ? buildMessageFromTemplate(template, contact) : buildMessage(contact);
 
       // Resolve the correct WhatsApp ID (handles both @c.us and @lid accounts)
       const numberId = await client.getNumberId(phone);
@@ -154,6 +154,17 @@ Aqui está o seu resumo de hoje no clube:
 💳 *Saldo disponível:* R$ ${saldoFormatado}
 
 Qualquer dúvida, é só responder esta mensagem. 😊`;
+}
+
+function buildMessageFromTemplate(template, { name, value, balance, type }) {
+  const valorFormatado = formatCurrency(value);
+  const saldoFormatado = formatCurrency(balance);
+
+  return template
+    .replace(/<nome>/g, name)
+    .replace(/<tipo>/g, type ?? '')
+    .replace(/<consumo>/g, valorFormatado)
+    .replace(/<saldo>/g, saldoFormatado);
 }
 
 function formatCurrency(value) {

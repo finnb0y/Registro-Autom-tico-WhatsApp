@@ -63,6 +63,35 @@ const COL_MAP: Record<string, string> = {
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
+const DEFAULT_TEMPLATE = `Olá, *<nome>*! 👋
+
+Aqui está o seu resumo de hoje no clube:
+
+📋 *Tipo de consumo:* <tipo>
+💰 *Consumo do dia:* R$ <consumo>
+💳 *Saldo disponível:* R$ <saldo>
+
+Qualquer dúvida, é só responder esta mensagem. 😊`;
+
+function formatCurrency(value: string | number): string {
+  const num = parseFloat(String(value));
+  if (isNaN(num)) return String(value);
+  return num.toFixed(2).replace('.', ',');
+}
+
+function previewMessage(template: string, contact?: Contact): string {
+  const name = contact?.name ?? 'João Silva';
+  const type = contact?.type ?? 'Restaurante';
+  const consumo = contact?.value !== undefined && contact?.value !== '' ? formatCurrency(contact.value) : '45,50';
+  const saldo = contact?.balance !== undefined && contact?.balance !== '' ? formatCurrency(contact.balance) : '320,00';
+
+  return template
+    .replace(/<nome>/g, name)
+    .replace(/<tipo>/g, type)
+    .replace(/<consumo>/g, consumo)
+    .replace(/<saldo>/g, saldo);
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -73,6 +102,7 @@ export default function Home() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState<string>(DEFAULT_TEMPLATE);
 
   const [waStatus, setWaStatus] = useState<WhatsAppStatus>({ connected: false, hasQr: false, phone: null });
   const [qrImage, setQrImage] = useState<string | null>(null);
@@ -187,7 +217,7 @@ export default function Home() {
       const res = await fetch(`${SERVER_URL}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contacts }),
+        body: JSON.stringify({ contacts, template: messageTemplate }),
       });
       const data = await res.json();
       setResults(data.results || []);
@@ -274,6 +304,48 @@ export default function Home() {
             ⚠️ {parseError}
           </div>
         )}
+
+        {/* Construtor de mensagem */}
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <h2 className="font-semibold text-gray-800">✏️ Construtor de mensagem</h2>
+            <button
+              onClick={() => setMessageTemplate(DEFAULT_TEMPLATE)}
+              className="text-xs text-gray-500 hover:text-green-700 border border-gray-200 hover:border-green-400 px-3 py-1 rounded-lg transition-colors"
+            >
+              Restaurar padrão
+            </button>
+          </div>
+
+          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Textarea */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Template</label>
+              <textarea
+                value={messageTemplate}
+                onChange={(e) => setMessageTemplate(e.target.value)}
+                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-52 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400"
+              />
+              <p className="text-xs text-gray-400">
+                Variáveis disponíveis:{' '}
+                <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code>{' '}
+                <code className="bg-gray-100 rounded px-1">&lt;tipo&gt;</code>{' '}
+                <code className="bg-gray-100 rounded px-1">&lt;consumo&gt;</code>{' '}
+                <code className="bg-gray-100 rounded px-1">&lt;saldo&gt;</code>
+              </p>
+            </div>
+
+            {/* Pré-visualização */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                Pré-visualização {contacts.length > 0 ? `(${contacts[0].name})` : '(exemplo)'}
+              </label>
+              <div className="border border-gray-200 rounded-lg p-3 h-52 overflow-auto bg-gray-50 text-sm whitespace-pre-wrap text-gray-700 leading-relaxed">
+                {previewMessage(messageTemplate, contacts[0])}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Tabela de contatos */}
         {contacts.length > 0 && (
