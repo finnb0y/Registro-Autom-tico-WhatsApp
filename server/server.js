@@ -96,7 +96,7 @@ app.post('/send', async (req, res) => {
   for (const contact of contacts) {
     try {
       const phone = formatPhone(contact.phone);
-      const message = template ? buildMessageFromTemplate(template, contact) : buildMessage(contact);
+      const message = contact.message ?? (template ? buildMessageFromTemplate(template, contact) : buildMessage(contact));
 
       // Resolve the correct WhatsApp ID (handles both @c.us and @lid accounts)
       const numberId = await client.getNumberId(phone);
