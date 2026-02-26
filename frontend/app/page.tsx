@@ -9,9 +9,10 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
-  value: string | number;
-  balance: string | number;
-  type: string;
+  gastoCashGame?: number | string;
+  saldoTorneio?: number | string;
+  saldoBar?: number | string;
+  saldoTotal?: number | string;
 };
 
 type SendResult = {
@@ -27,95 +28,179 @@ type WhatsAppStatus = {
   phone: string | null;
 };
 
-// ─── Mapeamento de colunas ─────────────────────────────────────────────────────
-// Ajuste aqui se os nomes das colunas da sua planilha forem diferentes
+type RawRow = Record<string, unknown>;
 
-const COL_MAP: Record<string, string> = {
-  // nome
-  nome: 'name',
-  name: 'name',
-  cliente: 'name',
-  // telefone
-  telefone: 'phone',
-  fone: 'phone',
-  celular: 'phone',
-  phone: 'phone',
-  numero: 'phone',
-  'número': 'phone',
-  whatsapp: 'phone',
-  // valor consumido
-  valor: 'value',
-  consumo: 'value',
-  'valor consumido': 'value',
-  'consumo do dia': 'value',
-  value: 'value',
-  // saldo
-  saldo: 'balance',
-  balance: 'balance',
-  'saldo disponível': 'balance',
-  'saldo disponivel': 'balance',
-  // tipo
-  tipo: 'type',
-  type: 'type',
-  'tipo de consumo': 'type',
-  categoria: 'type',
-};
+// ─── Column aliases ───────────────────────────────────────────────────────────
+
+const NAME_ALIASES     = ['nome', 'name', 'cliente'];
+const PHONE_ALIASES    = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
+const CASH_ALIASES     = ['gasto cash game no dia', 'gasto cash game', 'cash game', 'consumo cash'];
+const TORNEIO_ALIASES  = ['saldo torneio', 'torneio'];
+const BAR_ALIASES      = ['saldo final no dia', 'saldo bar', 'bar', 'consumo bar'];
+const TOTAL_ALIASES    = ['saldo total', 'saldo', 'balance'];
+
+function findCol(row: RawRow, aliases: string[]): string | number | undefined {
+  for (const [k, v] of Object.entries(row)) {
+    if (aliases.includes(k.trim().toLowerCase())) return v as string | number;
+  }
+  return undefined;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
-const DEFAULT_TEMPLATE = `Olá, *<nome>*! 👋
+const DEFAULT_HEADER  = 'Olá, *<nome>*! 👋\n\nAqui está o seu resumo de hoje no clube:';
+const DEFAULT_CASH    = '🎲 *Cash Game:* R$ <gastoCashGame>';
+const DEFAULT_TORNEIO = '🏆 *Torneio:* R$ <saldoTorneio>';
+const DEFAULT_BAR     = '🍺 *Bar:* R$ <saldoBar>';
+const DEFAULT_FOOTER  = '💳 *Saldo Total:* R$ <saldoTotal>\n\nQualquer dúvida, é só responder esta mensagem. 😊';
 
-Aqui está o seu resumo de hoje no clube:
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-📋 *Tipo de consumo:* <tipo>
-💰 *Consumo do dia:* R$ <consumo>
-💳 *Saldo disponível:* R$ <saldo>
-
-Qualquer dúvida, é só responder esta mensagem. 😊`;
-
-function formatCurrency(value: string | number): string {
+function formatCurrency(value: string | number | undefined): string {
+  if (value === undefined || value === '') return '—';
   const num = parseFloat(String(value));
   if (isNaN(num)) return String(value);
   return num.toFixed(2).replace('.', ',');
 }
 
-function previewMessage(template: string, contact?: Contact): string {
-  const name = contact?.name ?? 'João Silva';
-  const type = contact?.type ?? 'Restaurante';
-  const consumo = contact?.value !== undefined && contact?.value !== '' ? formatCurrency(contact.value) : '45,50';
-  const saldo = contact?.balance !== undefined && contact?.balance !== '' ? formatCurrency(contact.balance) : '320,00';
+/** Returns "R$ X,XX" for a defined non-empty value, or "—" otherwise. */
+function formatOptionalCurrency(value: string | number | undefined): string {
+  if (value === undefined || value === '') return '—';
+  return `R$ ${formatCurrency(value)}`;
+}
 
-  return template
-    .replace(/<nome>/g, name)
-    .replace(/<tipo>/g, type)
-    .replace(/<consumo>/g, consumo)
-    .replace(/<saldo>/g, saldo);
+/** Normalises a raw cell value: returns the value if non-empty, otherwise undefined. */
+function normalizeValue(val: string | number | undefined): string | number | undefined {
+  return val !== undefined && val !== '' ? val : undefined;
+}
+
+function buildContactMessage(
+  contact: Contact,
+  header: string,
+  cashTpl: string,
+  torneioTpl: string,
+  barTpl: string,
+  footer: string,
+): string {
+  const lines: string[] = [];
+  lines.push(header.replace(/<nome>/g, contact.name));
+  lines.push('');
+  if (contact.gastoCashGame !== undefined && contact.gastoCashGame !== '') {
+    lines.push(cashTpl.replace(/<gastoCashGame>/g, formatCurrency(contact.gastoCashGame)));
+  }
+  if (contact.saldoTorneio !== undefined && contact.saldoTorneio !== '') {
+    lines.push(torneioTpl.replace(/<saldoTorneio>/g, formatCurrency(contact.saldoTorneio)));
+  }
+  if (contact.saldoBar !== undefined && contact.saldoBar !== '') {
+    lines.push(barTpl.replace(/<saldoBar>/g, formatCurrency(contact.saldoBar)));
+  }
+  lines.push('');
+  lines.push(footer.replace(/<saldoTotal>/g, formatCurrency(contact.saldoTotal)));
+  return lines.join('\n');
+}
+
+// ─── UploadZone sub-component ─────────────────────────────────────────────────
+
+function UploadZone({
+  label,
+  icon,
+  fileName,
+  loaded,
+  error,
+  required,
+  onFile,
+}: {
+  label: string;
+  icon: string;
+  fileName: string | null;
+  loaded: boolean;
+  error: string | null;
+  required?: boolean;
+  onFile: (file: File) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
+          ${loaded ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) onFile(file);
+        }}
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+        />
+        <div className="text-2xl mb-1">{loaded ? '✅' : icon}</div>
+        <p className="text-xs font-semibold text-gray-700">
+          {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[130px] mx-auto">
+          {fileName ?? 'Clique ou arraste'}
+        </p>
+      </div>
+      {error && <p className="text-xs text-red-600">⚠️ {error}</p>}
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [results, setResults] = useState<SendResult[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [messageTemplate, setMessageTemplate] = useState<string>(DEFAULT_TEMPLATE);
+  const [contacts, setContacts]     = useState<Contact[]>([]);
+  const [results, setResults]       = useState<SendResult[]>([]);
+  const [isSending, setIsSending]   = useState(false);
+  const [isDone, setIsDone]         = useState(false);
+
+  // Raw spreadsheet data
+  const [cadastrosData, setCadastrosData] = useState<RawRow[] | null>(null);
+  const [cashGameData, setCashGameData]   = useState<RawRow[] | null>(null);
+  const [torneioData, setTorneioData]     = useState<RawRow[] | null>(null);
+  const [barData, setBarData]             = useState<RawRow[] | null>(null);
+
+  // File names
+  const [cadastrosFile, setCadastrosFile] = useState<string | null>(null);
+  const [cashGameFile, setCashGameFile]   = useState<string | null>(null);
+  const [torneioFile, setTorneioFile]     = useState<string | null>(null);
+  const [barFile, setBarFile]             = useState<string | null>(null);
+
+  // Parse errors
+  const [cadastrosError, setCadastrosError] = useState<string | null>(null);
+  const [cashGameError, setCashGameError]   = useState<string | null>(null);
+  const [torneioError, setTorneioError]     = useState<string | null>(null);
+  const [barError, setBarError]             = useState<string | null>(null);
+
+  // Message template segments
+  const [headerTemplate, setHeaderTemplate]   = useState(DEFAULT_HEADER);
+  const [cashTemplate, setCashTemplate]       = useState(DEFAULT_CASH);
+  const [torneioTemplate, setTorneioTemplate] = useState(DEFAULT_TORNEIO);
+  const [barTemplate, setBarTemplate]         = useState(DEFAULT_BAR);
+  const [footerTemplate, setFooterTemplate]   = useState(DEFAULT_FOOTER);
 
   const [waStatus, setWaStatus] = useState<WhatsAppStatus>({ connected: false, hasQr: false, phone: null });
-  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [qrImage, setQrImage]   = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // ─── WhatsApp polling ────────────────────────────────────────────────────────
 
-  // Polling do status do WhatsApp
   const pollStatus = useCallback(async () => {
     try {
       const res = await fetch(`${SERVER_URL}/status`);
       const data: WhatsAppStatus = await res.json();
       setWaStatus(data);
-
       if (data.hasQr && !data.connected) {
         const qrRes = await fetch(`${SERVER_URL}/qr`);
         if (qrRes.ok) {
@@ -126,7 +211,6 @@ export default function Home() {
         setQrImage(null);
       }
     } catch {
-      // servidor offline
       setWaStatus({ connected: false, hasQr: false, phone: null });
     }
   }, []);
@@ -137,87 +221,141 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [pollStatus]);
 
-  // ─── Parse da planilha ───────────────────────────────────────────────────────
+  // ─── Auto-merge whenever any spreadsheet changes ──────────────────────────────
 
-  function parseFile(file: File) {
-    setParseError(null);
+  useEffect(() => {
+    if (!cadastrosData) { setContacts([]); return; }
+
+    const cashMap    = new Map<string, RawRow>();
+    const torneioMap = new Map<string, RawRow>();
+    const barMap     = new Map<string, RawRow>();
+
+    cashGameData?.forEach((r) => {
+      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
+      if (n) cashMap.set(n, r);
+    });
+    torneioData?.forEach((r) => {
+      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
+      if (n) torneioMap.set(n, r);
+    });
+    barData?.forEach((r) => {
+      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
+      if (n) barMap.set(n, r);
+    });
+
+    const merged: Contact[] = [];
+    cadastrosData.forEach((row, i) => {
+      const name  = String(findCol(row, NAME_ALIASES)  ?? '').trim();
+      const phone = String(findCol(row, PHONE_ALIASES) ?? '').trim();
+      if (!name || !phone) return;
+
+      const key        = name.toLowerCase();
+      const cashRow    = cashMap.get(key);
+      const torneioRow = torneioMap.get(key);
+      const barRow     = barMap.get(key);
+
+      const gastoCashGame = normalizeValue(cashRow    ? findCol(cashRow,    CASH_ALIASES)    as string | number | undefined : undefined);
+      const saldoTorneio  = normalizeValue(torneioRow ? findCol(torneioRow, TORNEIO_ALIASES) as string | number | undefined : undefined);
+      const saldoBar      = normalizeValue(barRow     ? findCol(barRow,     BAR_ALIASES)     as string | number | undefined : undefined);
+
+      // saldoTotal: prefer Cash Game > Torneio > Bar, as specified in the business rules
+      // (all three sheets should carry the same value; we just take the first available)
+      const saldoTotal = normalizeValue(
+        ((cashRow    && findCol(cashRow,    TOTAL_ALIASES)) ||
+         (torneioRow && findCol(torneioRow, TOTAL_ALIASES)) ||
+         (barRow     && findCol(barRow,     TOTAL_ALIASES)) ||
+         undefined) as string | number | undefined,
+      );
+
+      merged.push({
+        id:           `row-${i}`,
+        name,
+        phone,
+        gastoCashGame,
+        saldoTorneio,
+        saldoBar,
+        saldoTotal,
+      });
+    });
+
+    setContacts(merged);
     setResults([]);
     setIsDone(false);
-    setFileName(file.name);
+  }, [cadastrosData, cashGameData, torneioData, barData]);
 
+  // ─── Parse helpers ────────────────────────────────────────────────────────────
+
+  function parseSheet(
+    file: File,
+    onData: (rows: RawRow[]) => void,
+    onError: (msg: string) => void,
+  ) {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
-        if (rows.length === 0) {
-          setParseError('A planilha está vazia.');
-          return;
-        }
-
-        const mapped = rows.map((row, i) => {
-          const contact: Partial<Contact> & { id: string } = { id: `row-${i}` };
-
-          for (const [col, val] of Object.entries(row)) {
-            const normalized = col.trim().toLowerCase();
-            const mapped = COL_MAP[normalized];
-            if (mapped) {
-              (contact as Record<string, unknown>)[mapped] = val;
-            }
-          }
-
-          return contact as Contact;
-        });
-
-        // Verifica campos obrigatórios
-        const missing = mapped.filter((c) => !c.name || !c.phone);
-        if (missing.length === mapped.length) {
-          setParseError(
-            'Não foi possível identificar as colunas. Verifique se a planilha tem colunas com nomes como: Nome, Telefone, Valor, Saldo, Tipo.'
-          );
-          return;
-        }
-
-        setContacts(mapped.filter((c) => c.name && c.phone));
+        const wb   = XLSX.read(data, { type: 'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '' });
+        if (rows.length === 0) { onError('Planilha vazia.'); return; }
+        onData(rows);
       } catch {
-        setParseError('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
+        onError('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
       }
     };
     reader.readAsArrayBuffer(file);
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) parseFile(file);
+  function handleCadastros(file: File) {
+    setCadastrosError(null);
+    setCadastrosFile(file.name);
+    parseSheet(file, (rows) => {
+      const valid = rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES));
+      if (!valid) { setCadastrosError('Colunas Nome e Telefone não encontradas.'); return; }
+      setCadastrosData(rows);
+    }, setCadastrosError);
   }
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) parseFile(file);
+  function handleCashGame(file: File) {
+    setCashGameError(null);
+    setCashGameFile(file.name);
+    parseSheet(file, setCashGameData, setCashGameError);
+  }
+
+  function handleTorneio(file: File) {
+    setTorneioError(null);
+    setTorneioFile(file.name);
+    parseSheet(file, setTorneioData, setTorneioError);
+  }
+
+  function handleBar(file: File) {
+    setBarError(null);
+    setBarFile(file.name);
+    parseSheet(file, setBarData, setBarError);
   }
 
   function removeContact(id: string) {
     setContacts((prev) => prev.filter((c) => c.id !== id));
   }
 
-  // ─── Envio ───────────────────────────────────────────────────────────────────
+  // ─── Send ─────────────────────────────────────────────────────────────────────
 
   async function sendMessages() {
     if (!waStatus.connected) return;
     setIsSending(true);
     setResults([]);
 
+    const payload = contacts.map((c) => ({
+      name:    c.name,
+      phone:   c.phone,
+      message: buildContactMessage(c, headerTemplate, cashTemplate, torneioTemplate, barTemplate, footerTemplate),
+    }));
+
     try {
       const res = await fetch(`${SERVER_URL}/send`, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contacts, template: messageTemplate }),
+        body:    JSON.stringify({ contacts: payload }),
       });
       const data = await res.json();
       setResults(data.results || []);
@@ -229,10 +367,28 @@ export default function Home() {
     }
   }
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  // ─── Render helpers ───────────────────────────────────────────────────────────
 
-  const successCount = results.filter((r) => r.success).length;
-  const errorCount = results.filter((r) => !r.success).length;
+  const previewContact  = contacts[0];
+  const successCount    = results.filter((r) => r.success).length;
+  const errorCount      = results.filter((r) => !r.success).length;
+
+  const hasCash    = previewContact?.gastoCashGame !== undefined && previewContact.gastoCashGame !== '';
+  const hasTorneio = previewContact?.saldoTorneio  !== undefined && previewContact.saldoTorneio  !== '';
+  const hasBar     = previewContact?.saldoBar      !== undefined && previewContact.saldoBar      !== '';
+
+  // Fallback example when no contacts loaded yet
+  const exampleContact: Contact = previewContact ?? {
+    id:            'ex',
+    name:          'João Silva',
+    phone:         '11999999999',
+    gastoCashGame: 150,
+    saldoTorneio:  200,
+    saldoBar:      undefined,
+    saldoTotal:    350,
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
@@ -244,12 +400,8 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-gray-800">Resumos Diários</h1>
             <p className="text-gray-500 text-sm mt-0.5">Envie o resumo de consumo do dia pelo WhatsApp</p>
           </div>
-
-          {/* Status WhatsApp */}
           <div className="flex items-center gap-2 bg-white border rounded-lg px-4 py-2 shadow-sm">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${waStatus.connected ? 'bg-green-500' : 'bg-red-400'}`}
-            />
+            <span className={`w-2.5 h-2.5 rounded-full ${waStatus.connected ? 'bg-green-500' : 'bg-red-400'}`} />
             <span className="text-sm font-medium text-gray-700">
               {waStatus.connected
                 ? `WhatsApp conectado ${waStatus.phone ? `(+${waStatus.phone})` : ''}`
@@ -275,73 +427,185 @@ export default function Home() {
           </div>
         )}
 
-        {/* Upload */}
-        <div
-          className={`bg-white border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
-            ${isDragging ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <div className="text-4xl mb-2">📊</div>
-          <p className="font-medium text-gray-700">
-            {fileName ? fileName : 'Arraste a planilha aqui ou clique para selecionar'}
-          </p>
-          <p className="text-gray-400 text-sm mt-1">Aceita .xlsx e .xls</p>
-        </div>
-
-        {/* Erro de parse */}
-        {parseError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-            ⚠️ {parseError}
+        {/* Planilhas */}
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <h2 className="font-semibold text-gray-800 mb-4">📤 Planilhas</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <UploadZone
+              label="Cadastros"  icon="📋"
+              fileName={cadastrosFile} loaded={!!cadastrosData} error={cadastrosError}
+              required onFile={handleCadastros}
+            />
+            <UploadZone
+              label="Cash Game"  icon="🎲"
+              fileName={cashGameFile} loaded={!!cashGameData} error={cashGameError}
+              onFile={handleCashGame}
+            />
+            <UploadZone
+              label="Torneio"  icon="🏆"
+              fileName={torneioFile} loaded={!!torneioData} error={torneioError}
+              onFile={handleTorneio}
+            />
+            <UploadZone
+              label="Bar"  icon="🍺"
+              fileName={barFile} loaded={!!barData} error={barError}
+              onFile={handleBar}
+            />
           </div>
-        )}
+          {contacts.length > 0 && (
+            <p className="text-xs text-green-700 mt-3 font-medium">
+              ✅ {contacts.length} contato{contacts.length !== 1 ? 's' : ''} mesclado{contacts.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
 
         {/* Construtor de mensagem */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <div className="px-5 py-4 border-b flex items-center justify-between">
             <h2 className="font-semibold text-gray-800">✏️ Construtor de mensagem</h2>
             <button
-              onClick={() => setMessageTemplate(DEFAULT_TEMPLATE)}
+              onClick={() => {
+                setHeaderTemplate(DEFAULT_HEADER);
+                setCashTemplate(DEFAULT_CASH);
+                setTorneioTemplate(DEFAULT_TORNEIO);
+                setBarTemplate(DEFAULT_BAR);
+                setFooterTemplate(DEFAULT_FOOTER);
+              }}
               className="text-xs text-gray-500 hover:text-green-700 border border-gray-200 hover:border-green-400 px-3 py-1 rounded-lg transition-colors"
             >
               Restaurar padrão
             </button>
           </div>
 
-          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Textarea */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Template</label>
+          <div className="p-5 space-y-4">
+            {/* Cabeçalho */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cabeçalho</label>
               <textarea
-                value={messageTemplate}
-                onChange={(e) => setMessageTemplate(e.target.value)}
-                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-52 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400"
+                value={headerTemplate}
+                onChange={(e) => setHeaderTemplate(e.target.value)}
+                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
               />
-              <p className="text-xs text-gray-400">
-                Variáveis disponíveis:{' '}
-                <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code>{' '}
-                <code className="bg-gray-100 rounded px-1">&lt;tipo&gt;</code>{' '}
-                <code className="bg-gray-100 rounded px-1">&lt;consumo&gt;</code>{' '}
-                <code className="bg-gray-100 rounded px-1">&lt;saldo&gt;</code>
-              </p>
+              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code></p>
+            </div>
+
+            {/* Cash Game */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Cash Game</label>
+              </div>
+              <textarea
+                value={cashTemplate}
+                onChange={(e) => setCashTemplate(e.target.value)}
+                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-green-600"
+                style={{ background: '#d1fae5', borderColor: '#065f46' }}
+              />
+              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;gastoCashGame&gt;</code></p>
+            </div>
+
+            {/* Torneio */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Torneio</label>
+              </div>
+              <textarea
+                value={torneioTemplate}
+                onChange={(e) => setTorneioTemplate(e.target.value)}
+                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                style={{ background: '#dbeafe', borderColor: '#1e40af' }}
+              />
+              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTorneio&gt;</code></p>
+            </div>
+
+            {/* Bar */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Bar</label>
+              </div>
+              <textarea
+                value={barTemplate}
+                onChange={(e) => setBarTemplate(e.target.value)}
+                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-pink-700"
+                style={{ background: '#fce7f3', borderColor: '#9d174d' }}
+              />
+              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoBar&gt;</code></p>
+            </div>
+
+            {/* Rodapé */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rodapé</label>
+              <textarea
+                value={footerTemplate}
+                onChange={(e) => setFooterTemplate(e.target.value)}
+                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              />
+              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTotal&gt;</code></p>
             </div>
 
             {/* Pré-visualização */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Pré-visualização {contacts.length > 0 ? `(${contacts[0].name})` : '(exemplo)'}
-              </label>
-              <div className="border border-gray-200 rounded-lg p-3 h-52 overflow-auto bg-gray-50 text-sm whitespace-pre-wrap text-gray-700 leading-relaxed">
-                {previewMessage(messageTemplate, contacts[0])}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
+              </div>
+              <div className="p-4 space-y-1 text-sm">
+                <div className="whitespace-pre-wrap text-gray-700 mb-2">
+                  {headerTemplate.replace(/<nome>/g, exampleContact.name)}
+                </div>
+
+                {/* Cash Game segment */}
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                  style={{
+                    background: hasCash || !previewContact ? '#d1fae5' : 'transparent',
+                    opacity:    hasCash || !previewContact ? 1 : 0.4,
+                  }}
+                >
+                  <span className="flex-1 text-gray-700">
+                    {cashTemplate.replace(/<gastoCashGame>/g, formatCurrency(exampleContact.gastoCashGame))}
+                  </span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#059669' }}>
+                    {hasCash || !previewContact ? 'CASH' : 'CASH ❌'}
+                  </span>
+                </div>
+
+                {/* Torneio segment */}
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                  style={{
+                    background: hasTorneio || !previewContact ? '#dbeafe' : 'transparent',
+                    opacity:    hasTorneio || !previewContact ? 1 : 0.4,
+                  }}
+                >
+                  <span className="flex-1 text-gray-700">
+                    {torneioTemplate.replace(/<saldoTorneio>/g, formatCurrency(exampleContact.saldoTorneio))}
+                  </span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#2563eb' }}>
+                    {hasTorneio || !previewContact ? 'TORNEIO' : 'TORNEIO ❌'}
+                  </span>
+                </div>
+
+                {/* Bar segment */}
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                  style={{
+                    background: hasBar || !previewContact ? '#fce7f3' : 'transparent',
+                    opacity:    hasBar || !previewContact ? 1 : 0.4,
+                  }}
+                >
+                  <span className="flex-1 text-gray-700">
+                    {barTemplate.replace(/<saldoBar>/g, formatCurrency(exampleContact.saldoBar))}
+                  </span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#9d174d' }}>
+                    {hasBar || !previewContact ? 'BAR' : 'BAR ❌'}
+                  </span>
+                </div>
+
+                <div className="whitespace-pre-wrap text-gray-700 mt-2">
+                  {footerTemplate.replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal))}
+                </div>
               </div>
             </div>
           </div>
@@ -363,9 +627,10 @@ export default function Home() {
                   <tr>
                     <th className="px-4 py-3 text-left">Nome</th>
                     <th className="px-4 py-3 text-left">Telefone</th>
-                    <th className="px-4 py-3 text-left">Tipo</th>
-                    <th className="px-4 py-3 text-right">Consumo</th>
-                    <th className="px-4 py-3 text-right">Saldo</th>
+                    <th className="px-4 py-3 text-right">Cash Game</th>
+                    <th className="px-4 py-3 text-right">Torneio</th>
+                    <th className="px-4 py-3 text-right">Bar</th>
+                    <th className="px-4 py-3 text-right">Saldo Total</th>
                     <th className="px-4 py-3 text-center">Remover</th>
                   </tr>
                 </thead>
@@ -374,12 +639,17 @@ export default function Home() {
                     <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
                       <td className="px-4 py-3 text-gray-600">{c.phone}</td>
-                      <td className="px-4 py-3 text-gray-600">{c.type || '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-800">
-                        {c.value !== undefined && c.value !== '' ? `R$ ${Number(c.value).toFixed(2).replace('.', ',')}` : '—'}
+                        {formatOptionalCurrency(c.gastoCashGame)}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-800">
-                        {c.balance !== undefined && c.balance !== '' ? `R$ ${Number(c.balance).toFixed(2).replace('.', ',')}` : '—'}
+                        {formatOptionalCurrency(c.saldoTorneio)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {formatOptionalCurrency(c.saldoBar)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {formatOptionalCurrency(c.saldoTotal)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
@@ -401,7 +671,6 @@ export default function Home() {
                 <p className="text-sm text-amber-600">⚠️ Conecte o WhatsApp antes de enviar</p>
               )}
               {waStatus.connected && <p className="text-sm text-gray-500" />}
-
               <button
                 onClick={sendMessages}
                 disabled={isSending || !waStatus.connected || contacts.length === 0}
