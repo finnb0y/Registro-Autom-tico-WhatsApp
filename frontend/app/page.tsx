@@ -51,10 +51,10 @@ function findCol(row: RawRow, aliases: string[]): string | number | undefined {
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
 const DEFAULT_HEADER  = '📣 *Atualização de Saldo*\n\n👤 *Jogador:* <nome>';
-const DEFAULT_CASH    = '📊 *Saldo Atual:* R$ <gastoCashGame>';
-const DEFAULT_TORNEIO = 'Para fazer um acerto, esse é o pix:\npix.quadrapoker@gmail.com\nIBM-C6BANK';
-const DEFAULT_BAR     = 'Para solicitar o saque de algum valor deixado de crédito, basta informar a sua chave pix e o nome do titular da conta.';
-const DEFAULT_FOOTER  = 'Ficou alguma dúvida? Não hesite em perguntar.\n\n♣️ QUADRA POKER CLUB – Onde Brasília joga sério!';
+const DEFAULT_CASH    = '🎲 *Cash Game:* R$ <gastoCashGame>';
+const DEFAULT_TORNEIO = '🏆 *Torneio:* R$ <saldoTorneio>';
+const DEFAULT_BAR     = '🍺 *Bar:* R$ <saldoBar>';
+const DEFAULT_FOOTER  = '💳 *Saldo Total:* R$ <saldoTotal>\n\nPara fazer um acerto, esse é o pix:\npix.quadrapoker@gmail.com\nIBM-C6BANK\n\nPara solicitar o saque de algum valor deixado de crédito, basta informar a sua chave pix e o nome do titular da conta.\n\nFicou alguma dúvida? Não hesite em perguntar.\n\n♣️ QUADRA POKER CLUB – Onde Brasília joga sério!';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
