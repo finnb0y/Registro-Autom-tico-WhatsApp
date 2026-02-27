@@ -12,6 +12,7 @@ type Contact = {
   gastoCashGame?: number | string;
   saldoTorneio?: number | string;
   saldoBar?: number | string;
+  saldoDia?: number | string;
   saldoTotal?: number | string;
 };
 
@@ -32,12 +33,12 @@ type RawRow = Record<string, unknown>;
 
 // ─── Column aliases ───────────────────────────────────────────────────────────
 
-const NAME_ALIASES     = ['nome', 'name', 'cliente'];
+const NAME_ALIASES     = ['nome', 'name', 'cliente', 'cliente / comanda'];
 const PHONE_ALIASES    = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
-const CASH_ALIASES     = ['gasto cash game no dia', 'gasto cash game', 'cash game', 'consumo cash'];
-const TORNEIO_ALIASES  = ['saldo torneio', 'torneio'];
-const BAR_ALIASES      = ['saldo final no dia', 'saldo bar', 'bar', 'consumo bar'];
-const TOTAL_ALIASES    = ['saldo total', 'saldo', 'balance'];
+const CASH_ALIASES     = ['saldo/cashgame', 'saldo cashgame', 'saldo/cash game', 'saldo cash game', 'gasto cash game no dia', 'gasto cash game', 'cash game', 'consumo cash'];
+const TORNEIO_ALIASES  = ['saldo/torneio', 'saldo torneio', 'torneio'];
+const BAR_ALIASES      = ['saldo/comanda', 'saldo comanda', 'saldo/bar', 'saldo bar', 'bar', 'consumo bar', 'saldo final no dia'];
+const TOTAL_ALIASES    = ['saldo/final', 'saldo final', 'saldo total', 'saldo', 'balance'];
 
 function findCol(row: RawRow, aliases: string[]): string | number | undefined {
   for (const [k, v] of Object.entries(row)) {
@@ -54,7 +55,7 @@ const DEFAULT_HEADER  = '📣 *Atualização de Saldo*\n\n👤 *Jogador:* <nome>
 const DEFAULT_CASH    = '🎲 *Cash Game:* R$ <gastoCashGame>';
 const DEFAULT_TORNEIO = '🏆 *Torneio:* R$ <saldoTorneio>';
 const DEFAULT_BAR     = '🍺 *Bar:* R$ <saldoBar>';
-const DEFAULT_FOOTER  = '💳 *Saldo Total:* R$ <saldoTotal>\n\nPara fazer um acerto, esse é o pix:\npix.quadrapoker@gmail.com\nIBM-C6BANK\n\nPara solicitar o saque de algum valor deixado de crédito, basta informar a sua chave pix e o nome do titular da conta.\n\nFicou alguma dúvida? Não hesite em perguntar.\n\n♣️ QUADRA POKER CLUB – Onde Brasília joga sério!';
+const DEFAULT_FOOTER  = '💰 *Saldo do dia:* R$ <saldoDia>\n💳 *Saldo Total:* R$ <saldoTotal>\n\n*_Para fazer um acerto, esse é o pix:_*\npix.quadrapoker@gmail.com\n*_IBM-C6BANK_*\n\n*_Para solicitar o saque de algum valor deixado de crédito, basta informar a sua chave pix e o nome do titular da conta._*\n\n*_Ficou alguma dúvida? Não hesite em perguntar._*\n\n♣️ QUADRA POKER CLUB – Onde Brasília joga sério!';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,7 +98,16 @@ function buildContactMessage(
     lines.push(barTpl.replace(/<saldoBar>/g, formatCurrency(contact.saldoBar)));
   }
   lines.push('');
-  lines.push(footer.replace(/<saldoTotal>/g, formatCurrency(contact.saldoTotal)));
+  const saldoDiaNum   = contact.saldoDia   !== undefined && contact.saldoDia   !== '' ? parseFloat(String(contact.saldoDia))   : NaN;
+  const saldoTotalNum = contact.saldoTotal !== undefined && contact.saldoTotal !== '' ? parseFloat(String(contact.saldoTotal)) : NaN;
+  const showSaldoDia  = !isNaN(saldoDiaNum) && (isNaN(saldoTotalNum) || saldoDiaNum !== saldoTotalNum);
+  let builtFooter = footer.replace(/<saldoTotal>/g, formatCurrency(contact.saldoTotal));
+  if (showSaldoDia) {
+    builtFooter = builtFooter.replace(/<saldoDia>/g, formatCurrency(contact.saldoDia));
+  } else {
+    builtFooter = builtFooter.replace(/^.*<saldoDia>.*$\n?/m, '');
+  }
+  lines.push(builtFooter);
   return lines.join('\n');
 }
 
@@ -267,6 +277,13 @@ export default function Home() {
          undefined) as string | number | undefined,
       );
 
+      const saldoDiaParts = [gastoCashGame, saldoTorneio, saldoBar]
+        .filter((v) => v !== undefined && v !== '')
+        .map((v) => parseFloat(String(v)));
+      const saldoDia: number | undefined = saldoDiaParts.length > 0
+        ? saldoDiaParts.reduce((a, b) => a + b, 0)
+        : undefined;
+
       merged.push({
         id:           `row-${i}`,
         name,
@@ -274,6 +291,7 @@ export default function Home() {
         gastoCashGame,
         saldoTorneio,
         saldoBar,
+        saldoDia,
         saldoTotal,
       });
     });
@@ -385,7 +403,8 @@ export default function Home() {
     gastoCashGame: 150,
     saldoTorneio:  200,
     saldoBar:      undefined,
-    saldoTotal:    350,
+    saldoDia:      350,
+    saldoTotal:    500,
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -542,7 +561,7 @@ export default function Home() {
                 onChange={(e) => setFooterTemplate(e.target.value)}
                 className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
               />
-              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTotal&gt;</code></p>
+              <p className="text-xs text-gray-400">Variáveis: <code className="bg-gray-100 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-gray-100 rounded px-1">&lt;saldoTotal&gt;</code></p>
             </div>
 
             {/* Pré-visualização */}
@@ -604,7 +623,9 @@ export default function Home() {
                 </div>
 
                 <div className="whitespace-pre-wrap text-gray-700 mt-2">
-                  {footerTemplate.replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal))}
+                  {footerTemplate
+                    .replace(/<saldoDia>/g, formatCurrency(exampleContact.saldoDia))
+                    .replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal))}
                 </div>
               </div>
             </div>
@@ -630,6 +651,7 @@ export default function Home() {
                     <th className="px-4 py-3 text-right">Cash Game</th>
                     <th className="px-4 py-3 text-right">Torneio</th>
                     <th className="px-4 py-3 text-right">Bar</th>
+                    <th className="px-4 py-3 text-right">Saldo Dia</th>
                     <th className="px-4 py-3 text-right">Saldo Total</th>
                     <th className="px-4 py-3 text-center">Remover</th>
                   </tr>
@@ -647,6 +669,9 @@ export default function Home() {
                       </td>
                       <td className="px-4 py-3 text-right text-gray-800">
                         {formatOptionalCurrency(c.saldoBar)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {formatOptionalCurrency(c.saldoDia)}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-800">
                         {formatOptionalCurrency(c.saldoTotal)}
