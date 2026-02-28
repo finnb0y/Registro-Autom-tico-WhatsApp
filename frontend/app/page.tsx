@@ -234,32 +234,49 @@ export default function Home() {
   // ─── Auto-merge whenever any spreadsheet changes ──────────────────────────────
 
   useEffect(() => {
-    if (!cadastrosData) { setContacts([]); return; }
+    const hasAnyData = cashGameData || torneioData || barData;
+    if (!hasAnyData) { setContacts([]); return; }
 
+    // Mapa de cadastro: nome normalizado → telefone
+    const phoneMap = new Map<string, string>();
+    cadastrosData?.forEach((r) => {
+      const name  = String(findCol(r, NAME_ALIASES)  ?? '').trim();
+      const phone = String(findCol(r, PHONE_ALIASES) ?? '').trim();
+      if (name && phone) phoneMap.set(name.toLowerCase(), phone);
+    });
+
+    // Mapas de gastos: nome normalizado → linha da planilha
     const cashMap    = new Map<string, RawRow>();
     const torneioMap = new Map<string, RawRow>();
     const barMap     = new Map<string, RawRow>();
 
-    cashGameData?.forEach((r) => {
-      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
-      if (n) cashMap.set(n, r);
-    });
-    torneioData?.forEach((r) => {
-      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
-      if (n) torneioMap.set(n, r);
-    });
-    barData?.forEach((r) => {
-      const n = String(findCol(r, NAME_ALIASES) ?? '').trim().toLowerCase();
-      if (n) barMap.set(n, r);
-    });
+    // Conjunto ordenado de nomes (mantém ordem de aparição)
+    const namesInOrder: { key: string; originalName: string }[] = [];
+    const seenNames = new Set<string>();
+
+    function indexRows(rows: RawRow[] | null, map: Map<string, RawRow>) {
+      rows?.forEach((r) => {
+        const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        map.set(key, r);
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          namesInOrder.push({ key, originalName: name });
+        }
+      });
+    }
+
+    indexRows(cashGameData, cashMap);
+    indexRows(torneioData,  torneioMap);
+    indexRows(barData,      barMap);
 
     const merged: Contact[] = [];
-    cadastrosData.forEach((row, i) => {
-      const name  = String(findCol(row, NAME_ALIASES)  ?? '').trim();
-      const phone = String(findCol(row, PHONE_ALIASES) ?? '').trim();
-      if (!name || !phone) return;
 
-      const key        = name.toLowerCase();
+    namesInOrder.forEach(({ key, originalName }, i) => {
+      const phone = phoneMap.get(key) ?? '';
+      if (!phone) return; // sem telefone cadastrado, ignora
+
       const cashRow    = cashMap.get(key);
       const torneioRow = torneioMap.get(key);
       const barRow     = barMap.get(key);
@@ -286,7 +303,7 @@ export default function Home() {
 
       merged.push({
         id:           `row-${i}`,
-        name,
+        name:         originalName,
         phone,
         gastoCashGame,
         saldoTorneio,
@@ -307,6 +324,7 @@ export default function Home() {
     file: File,
     onData: (rows: RawRow[]) => void,
     onError: (msg: string) => void,
+    skipFirstRow = false,
   ) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -314,7 +332,8 @@ export default function Home() {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         const wb   = XLSX.read(data, { type: 'array' });
         const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '' });
+        const opts = skipFirstRow ? { defval: '', range: 1 } : { defval: '' };
+        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, opts);
         if (rows.length === 0) { onError('Planilha vazia.'); return; }
         onData(rows);
       } catch {
@@ -331,25 +350,25 @@ export default function Home() {
       const valid = rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES));
       if (!valid) { setCadastrosError('Colunas Nome e Telefone não encontradas.'); return; }
       setCadastrosData(rows);
-    }, setCadastrosError);
+    }, setCadastrosError, true);
   }
 
   function handleCashGame(file: File) {
     setCashGameError(null);
     setCashGameFile(file.name);
-    parseSheet(file, setCashGameData, setCashGameError);
+    parseSheet(file, setCashGameData, setCashGameError, true);
   }
 
   function handleTorneio(file: File) {
     setTorneioError(null);
     setTorneioFile(file.name);
-    parseSheet(file, setTorneioData, setTorneioError);
+    parseSheet(file, setTorneioData, setTorneioError, true);
   }
 
   function handleBar(file: File) {
     setBarError(null);
     setBarFile(file.name);
-    parseSheet(file, setBarData, setBarError);
+    parseSheet(file, setBarData, setBarError, true);
   }
 
   function removeContact(id: string) {
