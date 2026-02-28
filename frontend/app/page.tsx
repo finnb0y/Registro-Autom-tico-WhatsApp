@@ -324,7 +324,7 @@ export default function Home() {
     file: File,
     onData: (rows: RawRow[]) => void,
     onError: (msg: string) => void,
-    skipFirstRow = false,
+    validate?: (rows: RawRow[]) => boolean,
   ) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -332,10 +332,24 @@ export default function Home() {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         const wb   = XLSX.read(data, { type: 'array' });
         const ws   = wb.Sheets[wb.SheetNames[0]];
-        const opts = skipFirstRow ? { defval: '', range: 1 } : { defval: '' };
-        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, opts);
+
+        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '' });
         if (rows.length === 0) { onError('Planilha vazia.'); return; }
-        onData(rows);
+
+        if (!validate || validate(rows)) {
+          onData(rows);
+          return;
+        }
+
+        const rowsSkipped = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range: 1 });
+        if (rowsSkipped.length === 0) { onError('Planilha vazia.'); return; }
+
+        if (validate(rowsSkipped)) {
+          onData(rowsSkipped);
+          return;
+        }
+
+        onError('Colunas esperadas não encontradas na planilha.');
       } catch {
         onError('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
       }
@@ -346,29 +360,30 @@ export default function Home() {
   function handleCadastros(file: File) {
     setCadastrosError(null);
     setCadastrosFile(file.name);
-    parseSheet(file, (rows) => {
-      const valid = rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES));
-      if (!valid) { setCadastrosError('Colunas Nome e Telefone não encontradas.'); return; }
-      setCadastrosData(rows);
-    }, setCadastrosError, true);
+    parseSheet(
+      file,
+      setCadastrosData,
+      setCadastrosError,
+      (rows) => rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)),
+    );
   }
 
   function handleCashGame(file: File) {
     setCashGameError(null);
     setCashGameFile(file.name);
-    parseSheet(file, setCashGameData, setCashGameError, true);
+    parseSheet(file, setCashGameData, setCashGameError);
   }
 
   function handleTorneio(file: File) {
     setTorneioError(null);
     setTorneioFile(file.name);
-    parseSheet(file, setTorneioData, setTorneioError, true);
+    parseSheet(file, setTorneioData, setTorneioError);
   }
 
   function handleBar(file: File) {
     setBarError(null);
     setBarFile(file.name);
-    parseSheet(file, setBarData, setBarError, true);
+    parseSheet(file, setBarData, setBarError);
   }
 
   function removeContact(id: string) {
