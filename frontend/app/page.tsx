@@ -33,7 +33,17 @@ type RawRow = Record<string, unknown>;
 
 // ─── Column aliases ───────────────────────────────────────────────────────────
 
-const NAME_ALIASES     = ['nome', 'name', 'cliente', 'cliente / comanda'];
+const NAME_ALIASES     = [
+  'nome',
+  'name',
+  'cliente',
+  'cliente / comanda',
+  'cliente/comanda',
+  'cliente/ comanda',
+  'cliente /comanda',
+  'jogador',
+  'player',
+];
 const PHONE_ALIASES    = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
 const CASH_ALIASES     = ['saldo/cashgame', 'saldo cashgame', 'saldo/cash game', 'saldo cash game', 'gasto cash game no dia', 'gasto cash game', 'cash game', 'consumo cash'];
 const TORNEIO_ALIASES  = ['saldo/torneio', 'saldo torneio', 'torneio'];
@@ -42,7 +52,8 @@ const TOTAL_ALIASES    = ['saldo/final', 'saldo final', 'saldo total', 'saldo', 
 
 function findCol(row: RawRow, aliases: string[]): string | number | undefined {
   for (const [k, v] of Object.entries(row)) {
-    if (aliases.includes(k.trim().toLowerCase())) return v as string | number;
+    const normalizedKey = k.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (aliases.includes(normalizedKey)) return v as string | number;
   }
   return undefined;
 }
@@ -283,6 +294,9 @@ export default function Home() {
     const seenNames = new Set<string>();
 
     function indexRows(rows: RawRow[] | null, map: Map<string, RawRow>) {
+      if (rows && rows.length > 0) {
+        console.log('[Merge] 🔑 Colunas encontradas:', Object.keys(rows[0]).map(k => `"${k}"`).join(', '));
+      }
       rows?.forEach((r) => {
         const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
         if (!name) return;
