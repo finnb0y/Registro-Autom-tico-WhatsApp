@@ -244,6 +244,7 @@ export default function Home() {
   // ─── Manual merge ────────────────────────────────────────────────────────────
 
   function performMerge() {
+    console.log('Clique no botão merge detectado');
     if (!cadastrosData || !(cashGameData || torneioData || barData)) return;
 
     setMergeWarnings([]);
