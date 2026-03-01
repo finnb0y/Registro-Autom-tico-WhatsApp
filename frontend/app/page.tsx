@@ -86,6 +86,11 @@ function normalizeName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+/** Remove o sufixo de ID no formato " - XXX" do final do nome (ex: "João Silva - 042" → "João Silva") */
+function stripIdSuffix(name: string): string {
+  return name.replace(/\s*-\s*\S+\s*$/, '').trim();
+}
+
 function buildContactMessage(
   contact: Contact,
   header: string,
@@ -270,7 +275,7 @@ export default function Home() {
       rows?.forEach((r) => {
         const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
         if (!name) return;
-        const key = normalizeName(name);
+        const key = normalizeName(stripIdSuffix(name));
         map.set(key, r);
         if (!seenNames.has(key)) {
           seenNames.add(key);
