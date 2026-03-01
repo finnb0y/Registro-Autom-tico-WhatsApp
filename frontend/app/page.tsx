@@ -376,6 +376,7 @@ export default function Home() {
     onData: (rows: RawRow[]) => void,
     onError: (msg: string) => void,
     validate?: (rows: RawRow[]) => boolean,
+    skipFirstRow = false,
   ) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -384,7 +385,8 @@ export default function Home() {
         const wb   = XLSX.read(data, { type: 'array' });
         const ws   = wb.Sheets[wb.SheetNames[0]];
 
-        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '' });
+        const range = skipFirstRow ? 1 : undefined;
+        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range });
         if (rows.length === 0) { onError('Planilha vazia.'); return; }
 
         if (!validate || validate(rows)) {
@@ -392,7 +394,7 @@ export default function Home() {
           return;
         }
 
-        const rowsSkipped = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range: 1 });
+        const rowsSkipped = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range: (range ?? 0) + 1 });
         if (rowsSkipped.length === 0) { onError('Planilha vazia.'); return; }
 
         if (validate(rowsSkipped)) {
@@ -426,7 +428,7 @@ export default function Home() {
     setCashGameFile(file.name);
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setCashGameData, setCashGameError);
+    parseSheet(file, setCashGameData, setCashGameError, undefined, true);
   }
 
   function handleTorneio(file: File) {
@@ -434,7 +436,7 @@ export default function Home() {
     setTorneioFile(file.name);
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setTorneioData, setTorneioError);
+    parseSheet(file, setTorneioData, setTorneioError, undefined, true);
   }
 
   function handleBar(file: File) {
@@ -442,7 +444,7 @@ export default function Home() {
     setBarFile(file.name);
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setBarData, setBarError);
+    parseSheet(file, setBarData, setBarError, undefined, true);
   }
 
   function downloadTreated() {
