@@ -77,6 +77,15 @@ function normalizeValue(val: string | number | undefined): string | number | und
   return val !== undefined && val !== '' ? val : undefined;
 }
 
+/** Normaliza nome para comparação: minúsculas + sem acentos + sem espaços extras */
+function normalizeName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function buildContactMessage(
   contact: Contact,
   header: string,
@@ -203,6 +212,7 @@ export default function Home() {
 
   const [waStatus, setWaStatus] = useState<WhatsAppStatus>({ connected: false, hasQr: false, phone: null });
   const [qrImage, setQrImage]   = useState<string | null>(null);
+  const [mergeWarnings, setMergeWarnings] = useState<string[]>([]);
 
   // ─── WhatsApp polling ────────────────────────────────────────────────────────
 
@@ -236,12 +246,14 @@ export default function Home() {
   function performMerge() {
     if (!cadastrosData || !(cashGameData || torneioData || barData)) return;
 
+    setMergeWarnings([]);
+
     // Mapa de cadastro: nome normalizado → telefone
     const phoneMap = new Map<string, string>();
     cadastrosData.forEach((r) => {
       const name  = String(findCol(r, NAME_ALIASES)  ?? '').trim();
       const phone = String(findCol(r, PHONE_ALIASES) ?? '').trim();
-      if (name && phone) phoneMap.set(name.toLowerCase(), phone);
+      if (name && phone) phoneMap.set(normalizeName(name), phone);
     });
 
     // Mapas de gastos: nome normalizado → linha da planilha
@@ -257,7 +269,7 @@ export default function Home() {
       rows?.forEach((r) => {
         const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
         if (!name) return;
-        const key = name.toLowerCase();
+        const key = normalizeName(name);
         map.set(key, r);
         if (!seenNames.has(key)) {
           seenNames.add(key);
@@ -271,10 +283,14 @@ export default function Home() {
     indexRows(barData,      barMap);
 
     const merged: Contact[] = [];
+    const warnings: string[] = [];
 
     namesInOrder.forEach(({ key, originalName }, i) => {
       const phone = phoneMap.get(key) ?? '';
-      if (!phone) return; // sem telefone cadastrado, ignora
+      if (!phone) {
+        warnings.push(originalName);
+        return; // sem telefone cadastrado, ignora
+      }
 
       const cashRow    = cashMap.get(key);
       const torneioRow = torneioMap.get(key);
@@ -313,6 +329,7 @@ export default function Home() {
     });
 
     setContacts(merged);
+    setMergeWarnings(warnings);
     setResults([]);
     setIsDone(false);
   }
@@ -360,6 +377,7 @@ export default function Home() {
     setCadastrosError(null);
     setCadastrosFile(file.name);
     setContacts([]);
+    setMergeWarnings([]);
     parseSheet(
       file,
       setCadastrosData,
@@ -372,6 +390,7 @@ export default function Home() {
     setCashGameError(null);
     setCashGameFile(file.name);
     setContacts([]);
+    setMergeWarnings([]);
     parseSheet(file, setCashGameData, setCashGameError);
   }
 
@@ -379,6 +398,7 @@ export default function Home() {
     setTorneioError(null);
     setTorneioFile(file.name);
     setContacts([]);
+    setMergeWarnings([]);
     parseSheet(file, setTorneioData, setTorneioError);
   }
 
@@ -386,6 +406,7 @@ export default function Home() {
     setBarError(null);
     setBarFile(file.name);
     setContacts([]);
+    setMergeWarnings([]);
     parseSheet(file, setBarData, setBarError);
   }
 
@@ -549,6 +570,12 @@ export default function Home() {
                   ⬇️ Baixar Planilha Tratada (.xlsx)
                 </button>
               </>
+            )}
+            {mergeWarnings.length > 0 && (
+              <div className="w-full mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-800">
+                <p className="font-semibold mb-1">⚠️ {mergeWarnings.length} nome{mergeWarnings.length !== 1 ? 's' : ''} sem telefone no Cadastro (ignorado{mergeWarnings.length !== 1 ? 's' : ''}):</p>
+                <p className="text-yellow-700">{mergeWarnings.join(', ')}</p>
+              </div>
             )}
           </div>
         </div>
