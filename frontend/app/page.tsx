@@ -234,7 +234,7 @@ export default function Home() {
   // ─── Auto-merge whenever any spreadsheet changes ──────────────────────────────
 
   useEffect(() => {
-    const hasAnyData = cashGameData || torneioData || barData;
+    const hasAnyData = cadastrosData && (cashGameData || torneioData || barData);
     if (!hasAnyData) { setContacts([]); return; }
 
     // Mapa de cadastro: nome normalizado → telefone
