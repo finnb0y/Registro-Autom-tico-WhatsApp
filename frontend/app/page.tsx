@@ -231,15 +231,14 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [pollStatus]);
 
-  // ─── Auto-merge whenever any spreadsheet changes ──────────────────────────────
+  // ─── Manual merge ────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const hasAnyData = cadastrosData && (cashGameData || torneioData || barData);
-    if (!hasAnyData) { setContacts([]); return; }
+  function performMerge() {
+    if (!cadastrosData || !(cashGameData || torneioData || barData)) return;
 
     // Mapa de cadastro: nome normalizado → telefone
     const phoneMap = new Map<string, string>();
-    cadastrosData?.forEach((r) => {
+    cadastrosData.forEach((r) => {
       const name  = String(findCol(r, NAME_ALIASES)  ?? '').trim();
       const phone = String(findCol(r, PHONE_ALIASES) ?? '').trim();
       if (name && phone) phoneMap.set(name.toLowerCase(), phone);
@@ -316,7 +315,7 @@ export default function Home() {
     setContacts(merged);
     setResults([]);
     setIsDone(false);
-  }, [cadastrosData, cashGameData, torneioData, barData]);
+  }
 
   // ─── Parse helpers ────────────────────────────────────────────────────────────
 
@@ -360,6 +359,7 @@ export default function Home() {
   function handleCadastros(file: File) {
     setCadastrosError(null);
     setCadastrosFile(file.name);
+    setContacts([]);
     parseSheet(
       file,
       setCadastrosData,
@@ -371,19 +371,38 @@ export default function Home() {
   function handleCashGame(file: File) {
     setCashGameError(null);
     setCashGameFile(file.name);
+    setContacts([]);
     parseSheet(file, setCashGameData, setCashGameError);
   }
 
   function handleTorneio(file: File) {
     setTorneioError(null);
     setTorneioFile(file.name);
+    setContacts([]);
     parseSheet(file, setTorneioData, setTorneioError);
   }
 
   function handleBar(file: File) {
     setBarError(null);
     setBarFile(file.name);
+    setContacts([]);
     parseSheet(file, setBarData, setBarError);
+  }
+
+  function downloadTreated() {
+    const rows = contacts.map((c) => ({
+      Nome:        c.name,
+      Telefone:    c.phone,
+      'Cash Game': c.gastoCashGame ?? '',
+      Torneio:     c.saldoTorneio  ?? '',
+      Bar:         c.saldoBar      ?? '',
+      'Saldo Dia': c.saldoDia      ?? '',
+      'Saldo Total': c.saldoTotal  ?? '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+    XLSX.writeFile(wb, 'planilha_tratada.xlsx');
   }
 
   function removeContact(id: string) {
@@ -421,6 +440,7 @@ export default function Home() {
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
+  const canMerge        = !!(cadastrosData && (cashGameData || torneioData || barData));
   const previewContact  = contacts[0];
   const successCount    = results.filter((r) => r.success).length;
   const errorCount      = results.filter((r) => !r.success).length;
@@ -505,11 +525,32 @@ export default function Home() {
               onFile={handleBar}
             />
           </div>
-          {contacts.length > 0 && (
-            <p className="text-xs text-green-700 mt-3 font-medium">
-              ✅ {contacts.length} contato{contacts.length !== 1 ? 's' : ''} mesclado{contacts.length !== 1 ? 's' : ''}
-            </p>
-          )}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={performMerge}
+              disabled={!canMerge}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all
+                ${!canMerge
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                }`}
+            >
+              🔀 Fazer Merge
+            </button>
+            {contacts.length > 0 && (
+              <>
+                <p className="text-xs text-green-700 font-medium">
+                  ✅ {contacts.length} contato{contacts.length !== 1 ? 's' : ''} mesclado{contacts.length !== 1 ? 's' : ''}
+                </p>
+                <button
+                  onClick={downloadTreated}
+                  className="px-4 py-2 rounded-lg font-semibold text-sm bg-green-600 hover:bg-green-700 text-white shadow-sm transition-all"
+                >
+                  ⬇️ Baixar Planilha Tratada (.xlsx)
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Construtor de mensagem */}
