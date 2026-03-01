@@ -249,8 +249,18 @@ export default function Home() {
   // ─── Manual merge ────────────────────────────────────────────────────────────
 
   function performMerge() {
-    console.log('Clique no botão merge detectado');
-    if (!cadastrosData || !(cashGameData || torneioData || barData)) return;
+    console.log('[Merge] 🖱️ Botão clicado');
+    if (!cadastrosData || !(cashGameData || torneioData || barData)) {
+      console.warn('[Merge] ❌ Merge bloqueado: dados insuficientes.', {
+        cadastrosData: !!cadastrosData,
+        cashGameData: !!cashGameData,
+        torneioData: !!torneioData,
+        barData: !!barData,
+      });
+      return;
+    }
+
+    console.log('[Merge] ⏳ Iniciando merge...');
 
     setMergeWarnings([]);
 
@@ -261,6 +271,7 @@ export default function Home() {
       const phone = String(findCol(r, PHONE_ALIASES) ?? '').trim();
       if (name && phone) phoneMap.set(normalizeName(name), phone);
     });
+    console.log(`[Merge] 📋 phoneMap gerado com ${phoneMap.size} entrada(s).`);
 
     // Mapas de gastos: nome normalizado → linha da planilha
     const cashMap    = new Map<string, RawRow>();
@@ -294,6 +305,7 @@ export default function Home() {
     namesInOrder.forEach(({ key, originalName }, i) => {
       const phone = phoneMap.get(key) ?? '';
       if (!phone) {
+        console.warn(`[Merge] ⚠️ Sem telefone para: "${originalName}" (ignorado)`);
         warnings.push(originalName);
         return; // sem telefone cadastrado, ignora
       }
@@ -338,6 +350,9 @@ export default function Home() {
     setMergeWarnings(warnings);
     setResults([]);
     setIsDone(false);
+    console.log(
+      `[Merge] ✅ Merge concluído! ${merged.length} contato(s) mesclado(s), ${warnings.length} ignorado(s) por falta de telefone.`
+    );
   }
 
   // ─── Parse helpers ────────────────────────────────────────────────────────────
