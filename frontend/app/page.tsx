@@ -46,7 +46,7 @@ const NAME_ALIASES     = [
 ];
 const PHONE_ALIASES    = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
 const CASH_ALIASES     = ['saldo/cashgame', 'saldo cashgame', 'saldo/cash game', 'saldo cash game', 'gasto cash game no dia', 'gasto cash game', 'gastocashgame', 'cash game', 'consumo cash'];
-const TORNEIO_ALIASES  = ['saldo/torneio', 'saldo torneio', 'torneio'];
+const TORNEIO_ALIASES  = ['saldo/torneio', 'saldo torneio', 'torneio', 'saldotorneio'];
 const BAR_ALIASES      = ['saldo/comanda', 'saldo comanda', 'saldo/bar', 'saldo bar', 'bar', 'consumo bar', 'saldo final no dia'];
 const TOTAL_ALIASES    = ['saldo/final', 'saldo final', 'saldo total', 'saldo', 'balance'];
 
