@@ -178,7 +178,7 @@ function UploadZone({
           type="file"
           accept=".xlsx,.xls"
           className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
         />
         <div className="text-2xl mb-1">{loaded ? '✅' : icon}</div>
         <p className="text-xs font-semibold text-gray-700">
@@ -193,31 +193,110 @@ function UploadZone({
   );
 }
 
+// ─── MultiUploadZone sub-component ───────────────────────────────────────────
+
+type MultiFile = { name: string; data: RawRow[]; error?: string };
+
+function MultiUploadZone({
+  label,
+  icon,
+  files,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  icon: string;
+  files: MultiFile[];
+  onAdd: (file: File) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
+          ${files.length > 0 ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const dropped = Array.from(e.dataTransfer.files);
+          dropped.forEach((f) => onAdd(f));
+        }}
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            Array.from(e.target.files ?? []).forEach((f) => onAdd(f));
+            e.target.value = '';
+          }}
+        />
+        <div className="text-2xl mb-1">{files.length > 0 ? '✅' : icon}</div>
+        <p className="text-xs font-semibold text-gray-700">{label}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {files.length > 0 ? `${files.length} arquivo${files.length !== 1 ? 's' : ''}` : '+ Adicionar'}
+        </p>
+      </div>
+      {files.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {files.map((f, i) => (
+            <li key={i} className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+                <span className="text-xs text-gray-700 flex-1 truncate">{f.name}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+                  className="text-gray-400 hover:text-red-500 font-bold text-sm w-5 h-5 rounded-full hover:bg-red-50 shrink-0"
+                  title="Remover"
+                >
+                  ×
+                </button>
+              </div>
+              {f.error && <p className="text-xs text-red-600 px-1">⚠️ {f.error}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  // ─── Navigation mode ──────────────────────────────────────────────────────
+  const [mode, setMode] = useState<null | 'resumos' | 'envio-massa'>(null);
+
   const [contacts, setContacts]     = useState<Contact[]>([]);
   const [results, setResults]       = useState<SendResult[]>([]);
   const [isSending, setIsSending]   = useState(false);
   const [isDone, setIsDone]         = useState(false);
 
-  // Raw spreadsheet data
+  // Raw spreadsheet data (Resumos mode)
   const [cadastrosData, setCadastrosData] = useState<RawRow[] | null>(null);
-  const [cashGameData, setCashGameData]   = useState<RawRow[] | null>(null);
-  const [torneioData, setTorneioData]     = useState<RawRow[] | null>(null);
-  const [barData, setBarData]             = useState<RawRow[] | null>(null);
-
-  // File names
   const [cadastrosFile, setCadastrosFile] = useState<string | null>(null);
-  const [cashGameFile, setCashGameFile]   = useState<string | null>(null);
-  const [torneioFile, setTorneioFile]     = useState<string | null>(null);
-  const [barFile, setBarFile]             = useState<string | null>(null);
-
-  // Parse errors
   const [cadastrosError, setCadastrosError] = useState<string | null>(null);
-  const [cashGameError, setCashGameError]   = useState<string | null>(null);
-  const [torneioError, setTorneioError]     = useState<string | null>(null);
-  const [barError, setBarError]             = useState<string | null>(null);
+
+  // Multi-file states for Resumos mode categories
+  const [cashGameFiles, setCashGameFiles]   = useState<MultiFile[]>([]);
+  const [torneioFiles, setTorneioFiles]     = useState<MultiFile[]>([]);
+  const [barFiles, setBarFiles]             = useState<MultiFile[]>([]);
+
+  // Envio em Massa mode state
+  const [massaCadastrosData, setMassaCadastrosData] = useState<RawRow[] | null>(null);
+  const [massaCadastrosFile, setMassaCadastrosFile] = useState<string | null>(null);
+  const [massaCadastrosError, setMassaCadastrosError] = useState<string | null>(null);
+  const [massaMessage, setMassaMessage] = useState('');
+  const [massaResults, setMassaResults] = useState<SendResult[]>([]);
+  const [massaIsSending, setMassaIsSending] = useState(false);
+  const [massaIsDone, setMassaIsDone] = useState(false);
 
   // Message template segments
   const [headerTemplate, setHeaderTemplate]   = useState(DEFAULT_HEADER);
@@ -261,12 +340,12 @@ export default function Home() {
 
   function performMerge() {
     console.log('[Merge] 🖱️ Botão clicado');
-    if (!cadastrosData || !(cashGameData || torneioData || barData)) {
+    if (!cadastrosData || !(cashGameFiles.length > 0 || torneioFiles.length > 0 || barFiles.length > 0)) {
       console.warn('[Merge] ❌ Merge bloqueado: dados insuficientes.', {
         cadastrosData: !!cadastrosData,
-        cashGameData: !!cashGameData,
-        torneioData: !!torneioData,
-        barData: !!barData,
+        cashGameFiles: cashGameFiles.length,
+        torneioFiles: torneioFiles.length,
+        barFiles: barFiles.length,
       });
       return;
     }
@@ -293,11 +372,8 @@ export default function Home() {
     const namesInOrder: { key: string; originalName: string }[] = [];
     const seenNames = new Set<string>();
 
-    function indexRows(rows: RawRow[] | null, map: Map<string, RawRow>) {
-      if (rows && rows.length > 0) {
-        console.log('[Merge] 🔑 Colunas encontradas:', Object.keys(rows[0]).map(k => `"${k}"`).join(', '));
-      }
-      rows?.forEach((r) => {
+    function indexRows(rows: RawRow[], map: Map<string, RawRow>) {
+      rows.forEach((r) => {
         const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
         if (!name) return;
         const key = normalizeName(stripIdSuffix(name));
@@ -309,9 +385,14 @@ export default function Home() {
       });
     }
 
-    indexRows(cashGameData, cashMap);
-    indexRows(torneioData,  torneioMap);
-    indexRows(barData,      barMap);
+    // Concatenar todas as linhas de cada categoria
+    const allCashRows    = cashGameFiles.flatMap((f) => f.data);
+    const allTorneioRows = torneioFiles.flatMap((f) => f.data);
+    const allBarRows     = barFiles.flatMap((f) => f.data);
+
+    indexRows(allCashRows,    cashMap);
+    indexRows(allTorneioRows, torneioMap);
+    indexRows(allBarRows,     barMap);
 
     const merged: Contact[] = [];
     const warnings: string[] = [];
@@ -423,28 +504,106 @@ export default function Home() {
     );
   }
 
-  function handleCashGame(file: File) {
-    setCashGameError(null);
-    setCashGameFile(file.name);
+  function handleAddCashGame(file: File) {
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setCashGameData, setCashGameError, undefined, true);
+    parseSheet(
+      file,
+      (data) => setCashGameFiles((prev) => [...prev, { name: file.name, data }]),
+      (error) => setCashGameFiles((prev) => [...prev, { name: file.name, data: [], error }]),
+      undefined,
+      true,
+    );
   }
 
-  function handleTorneio(file: File) {
-    setTorneioError(null);
-    setTorneioFile(file.name);
+  function handleRemoveCashGame(index: number) {
+    setCashGameFiles((prev) => prev.filter((_, i) => i !== index));
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setTorneioData, setTorneioError, undefined, true);
   }
 
-  function handleBar(file: File) {
-    setBarError(null);
-    setBarFile(file.name);
+  function handleAddTorneio(file: File) {
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(file, setBarData, setBarError, undefined, true);
+    parseSheet(
+      file,
+      (data) => setTorneioFiles((prev) => [...prev, { name: file.name, data }]),
+      (error) => setTorneioFiles((prev) => [...prev, { name: file.name, data: [], error }]),
+      undefined,
+      true,
+    );
+  }
+
+  function handleRemoveTorneio(index: number) {
+    setTorneioFiles((prev) => prev.filter((_, i) => i !== index));
+    setContacts([]);
+    setMergeWarnings([]);
+  }
+
+  function handleAddBar(file: File) {
+    setContacts([]);
+    setMergeWarnings([]);
+    parseSheet(
+      file,
+      (data) => setBarFiles((prev) => [...prev, { name: file.name, data }]),
+      (error) => setBarFiles((prev) => [...prev, { name: file.name, data: [], error }]),
+      undefined,
+      true,
+    );
+  }
+
+  function handleRemoveBar(index: number) {
+    setBarFiles((prev) => prev.filter((_, i) => i !== index));
+    setContacts([]);
+    setMergeWarnings([]);
+  }
+
+  // Envio em Massa handlers
+  function handleMassaCadastros(file: File) {
+    setMassaCadastrosError(null);
+    setMassaCadastrosFile(file.name);
+    setMassaResults([]);
+    setMassaIsDone(false);
+    parseSheet(
+      file,
+      setMassaCadastrosData,
+      setMassaCadastrosError,
+      (rows) => rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)),
+    );
+  }
+
+  async function sendMassMessages() {
+    if (!waStatus.connected || !massaCadastrosData || !massaMessage.trim()) return;
+    setMassaIsSending(true);
+    setMassaResults([]);
+
+    const payload = massaCadastrosData
+      .map((r) => ({
+        name:  String(findCol(r, NAME_ALIASES)  ?? '').trim(),
+        phone: String(findCol(r, PHONE_ALIASES) ?? '').trim(),
+      }))
+      .filter((c) => c.name && c.phone)
+      .map((c) => ({
+        name:    c.name,
+        phone:   c.phone,
+        message: massaMessage.replace(/<nome>/g, c.name),
+      }));
+
+    try {
+      const res = await fetch(`${SERVER_URL}/send`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ contacts: payload }),
+      });
+      const data = await res.json();
+      setMassaResults(data.results || []);
+      setMassaIsDone(true);
+    } catch (err) {
+      console.error('[sendMassMessages] Erro:', err);
+      alert('Erro ao conectar com o servidor. Verifique se ele está rodando.');
+    } finally {
+      setMassaIsSending(false);
+    }
   }
 
   function downloadTreated() {
@@ -498,7 +657,7 @@ export default function Home() {
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
-  const canMerge        = !!(cadastrosData && (cashGameData || torneioData || barData));
+  const canMerge        = !!(cadastrosData && (cashGameFiles.length > 0 || torneioFiles.length > 0 || barFiles.length > 0));
   const previewContact  = contacts[0];
   const successCount    = results.filter((r) => r.success).length;
   const errorCount      = results.filter((r) => !r.success).length;
@@ -519,44 +678,243 @@ export default function Home() {
     saldoTotal:    500,
   };
 
+  const massaContactCount = massaCadastrosData
+    ? massaCadastrosData.filter((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)).length
+    : 0;
+  const massaSuccessCount = massaResults.filter((r) => r.success).length;
+  const massaErrorCount   = massaResults.filter((r) => !r.success).length;
+
+  // ─── WhatsApp status badge (shared) ──────────────────────────────────────────
+
+  const waBadge = (
+    <div className="flex items-center gap-2 bg-white border rounded-lg px-4 py-2 shadow-sm">
+      <span className={`w-2.5 h-2.5 rounded-full ${waStatus.connected ? 'bg-green-500' : 'bg-red-400'}`} />
+      <span className="text-sm font-medium text-gray-700">
+        {waStatus.connected
+          ? `WhatsApp conectado ${waStatus.phone ? `(+${waStatus.phone})` : ''}`
+          : 'WhatsApp desconectado'}
+      </span>
+    </div>
+  );
+
+  // ─── QR Code block (shared) ───────────────────────────────────────────────────
+
+  const qrBlock = !waStatus.connected && (
+    <div className="bg-white border rounded-xl shadow-sm p-6 flex flex-col items-center gap-4">
+      <h2 className="text-lg font-semibold text-gray-800">Conecte o WhatsApp</h2>
+      {qrImage ? (
+        <>
+          <p className="text-gray-500 text-sm text-center">
+            Abra o WhatsApp no celular → Menu (⋮) → Aparelhos conectados → Conectar aparelho
+          </p>
+          <img src={qrImage} alt="QR Code WhatsApp" className="w-56 h-56 rounded-lg border" />
+        </>
+      ) : (
+        <p className="text-gray-400 text-sm">Aguardando QR Code do servidor…</p>
+      )}
+    </div>
+  );
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
+  // ── Mode selection screen ────────────────────────────────────────────────────
+  if (mode === null) {
+    return (
+      <main className="min-h-screen bg-gray-50 py-10 px-4">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">♣️ Quadra Poker Club</h1>
+              <p className="text-gray-500 text-sm mt-0.5">Selecione o modo de uso</p>
+            </div>
+            {waBadge}
+          </div>
+          {qrBlock}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Resumos Diários */}
+            <button
+              onClick={() => setMode('resumos')}
+              className="group bg-white border-2 border-gray-200 hover:border-blue-400 rounded-2xl p-8 text-left shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="text-5xl mb-4">📊</div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Resumos Diários</h2>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Faça upload das planilhas de Cadastros, Cash Game, Torneio e Bar, mescle os dados e envie mensagens personalizadas para cada jogador.
+              </p>
+              <div className="mt-4 text-blue-600 text-sm font-semibold group-hover:underline">
+                Entrar →
+              </div>
+            </button>
+
+            {/* Envio em Massa */}
+            <button
+              onClick={() => setMode('envio-massa')}
+              className="group bg-white border-2 border-gray-200 hover:border-purple-400 rounded-2xl p-8 text-left shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="text-5xl mb-4">📨</div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Envio em Massa</h2>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Digite uma mensagem e envie para todos os contatos de uma planilha de Cadastros de uma só vez.
+              </p>
+              <div className="mt-4 text-purple-600 text-sm font-semibold group-hover:underline">
+                Entrar →
+              </div>
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ── Envio em Massa screen ────────────────────────────────────────────────────
+  if (mode === 'envio-massa') {
+    return (
+      <main className="min-h-screen bg-gray-50 py-10 px-4">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMode(null)}
+                className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-400 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                ← Voltar
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">📨 Envio em Massa</h1>
+                <p className="text-gray-500 text-sm mt-0.5">Envie a mesma mensagem para todos os contatos</p>
+              </div>
+            </div>
+            {waBadge}
+          </div>
+
+          {qrBlock}
+
+          {/* Cadastros upload */}
+          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800">📤 Planilha de Contatos</h2>
+            <div className="max-w-xs">
+              <UploadZone
+                label="Cadastros"
+                icon="📋"
+                fileName={massaCadastrosFile}
+                loaded={!!massaCadastrosData}
+                error={massaCadastrosError}
+                required
+                onFile={handleMassaCadastros}
+              />
+            </div>
+            {massaCadastrosData && (
+              <p className="text-xs text-green-700 font-medium">
+                ✅ {massaContactCount} contato{massaContactCount !== 1 ? 's' : ''} carregado{massaContactCount !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+
+          {/* Message textarea */}
+          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-3">
+            <h2 className="font-semibold text-gray-800">✉️ Mensagem</h2>
+            <textarea
+              value={massaMessage}
+              onChange={(e) => setMassaMessage(e.target.value)}
+              placeholder={"Digite a mensagem que será enviada a todos os contatos…\n\nUse <nome> para personalizar com o nome de cada contato."}
+              rows={8}
+              className="w-full font-mono text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+            />
+            <p className="text-xs text-gray-400">
+              Opcional: use <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code> para inserir o nome do contato na mensagem.
+            </p>
+          </div>
+
+          {/* Send button */}
+          <div className="bg-white rounded-xl shadow-sm border p-5 flex items-center justify-between">
+            {!waStatus.connected && (
+              <p className="text-sm text-amber-600">⚠️ Conecte o WhatsApp antes de enviar</p>
+            )}
+            {waStatus.connected && <p className="text-sm text-gray-500" />}
+            <button
+              onClick={sendMassMessages}
+              disabled={massaIsSending || !waStatus.connected || !massaCadastrosData || !massaMessage.trim()}
+              className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all
+                ${massaIsSending || !waStatus.connected || !massaCadastrosData || !massaMessage.trim()
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
+                }`}
+            >
+              {massaIsSending
+                ? `Enviando… (${massaResults.length}/${massaContactCount})`
+                : `Enviar para todos (${massaContactCount})`}
+            </button>
+          </div>
+
+          {/* Results */}
+          {massaIsDone && massaResults.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-5 py-4 border-b">
+                <h2 className="font-semibold text-gray-800">Resultado do envio</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  ✅ {massaSuccessCount} enviado{massaSuccessCount !== 1 ? 's' : ''}&nbsp;&nbsp;
+                  {massaErrorCount > 0 && <>❌ {massaErrorCount} com erro</>}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Nome</th>
+                      <th className="px-4 py-3 text-left">Telefone</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-left">Detalhe</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {massaResults.map((r, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-800">{r.name}</td>
+                        <td className="px-4 py-3 text-gray-600">{r.phone}</td>
+                        <td className="px-4 py-3 text-center">
+                          {r.success ? (
+                            <span className="text-green-600 font-semibold">✅ Enviado</span>
+                          ) : (
+                            <span className="text-red-500 font-semibold">❌ Erro</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{r.error || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  // ── Resumos Diários screen ───────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Resumos Diários</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Envie o resumo de consumo do dia pelo WhatsApp</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMode(null)}
+              className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-400 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              ← Voltar
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">📊 Resumos Diários</h1>
+              <p className="text-gray-500 text-sm mt-0.5">Envie o resumo de consumo do dia pelo WhatsApp</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-white border rounded-lg px-4 py-2 shadow-sm">
-            <span className={`w-2.5 h-2.5 rounded-full ${waStatus.connected ? 'bg-green-500' : 'bg-red-400'}`} />
-            <span className="text-sm font-medium text-gray-700">
-              {waStatus.connected
-                ? `WhatsApp conectado ${waStatus.phone ? `(+${waStatus.phone})` : ''}`
-                : 'WhatsApp desconectado'}
-            </span>
-          </div>
+          {waBadge}
         </div>
 
         {/* QR Code */}
-        {!waStatus.connected && (
-          <div className="bg-white border rounded-xl shadow-sm p-6 flex flex-col items-center gap-4">
-            <h2 className="text-lg font-semibold text-gray-800">Conecte o WhatsApp</h2>
-            {qrImage ? (
-              <>
-                <p className="text-gray-500 text-sm text-center">
-                  Abra o WhatsApp no celular → Menu (⋮) → Aparelhos conectados → Conectar aparelho
-                </p>
-                <img src={qrImage} alt="QR Code WhatsApp" className="w-56 h-56 rounded-lg border" />
-              </>
-            ) : (
-              <p className="text-gray-400 text-sm">Aguardando QR Code do servidor…</p>
-            )}
-          </div>
-        )}
+        {qrBlock}
 
         {/* Planilhas */}
         <div className="bg-white rounded-xl shadow-sm border p-5">
@@ -567,20 +925,23 @@ export default function Home() {
               fileName={cadastrosFile} loaded={!!cadastrosData} error={cadastrosError}
               required onFile={handleCadastros}
             />
-            <UploadZone
+            <MultiUploadZone
               label="Cash Game"  icon="🎲"
-              fileName={cashGameFile} loaded={!!cashGameData} error={cashGameError}
-              onFile={handleCashGame}
+              files={cashGameFiles}
+              onAdd={handleAddCashGame}
+              onRemove={handleRemoveCashGame}
             />
-            <UploadZone
+            <MultiUploadZone
               label="Torneio"  icon="🏆"
-              fileName={torneioFile} loaded={!!torneioData} error={torneioError}
-              onFile={handleTorneio}
+              files={torneioFiles}
+              onAdd={handleAddTorneio}
+              onRemove={handleRemoveTorneio}
             />
-            <UploadZone
+            <MultiUploadZone
               label="Bar"  icon="🍺"
-              fileName={barFile} loaded={!!barData} error={barError}
-              onFile={handleBar}
+              files={barFiles}
+              onAdd={handleAddBar}
+              onRemove={handleRemoveBar}
             />
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
