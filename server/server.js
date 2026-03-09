@@ -1,5 +1,5 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
 
@@ -108,6 +108,60 @@ app.post('/send', async (req, res) => {
 
       results.push({ name: contact.name, phone: contact.phone, success: true });
       console.log(`✅ Mensagem enviada para ${contact.name} (${contact.phone})`);
+
+      // Delay entre mensagens para evitar bloqueio (1.5 a 3 segundos)
+      const delay = 1500 + Math.random() * 1500;
+      await sleep(delay);
+    } catch (err) {
+      console.error(`❌ Erro ao enviar para ${contact.name}:`, err.message);
+      results.push({ name: contact.name, phone: contact.phone, success: false, error: err.message });
+    }
+  }
+
+  res.json({ results });
+});
+
+app.post('/send-image', async (req, res) => {
+  if (!isReady) {
+    return res.status(400).json({ error: 'WhatsApp não está conectado' });
+  }
+
+  const { contacts, imageBase64, mimeType } = req.body;
+
+  if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+    return res.status(400).json({ error: 'Nenhum contato fornecido' });
+  }
+
+  if (!imageBase64 || !mimeType) {
+    return res.status(400).json({ error: 'Imagem não fornecida' });
+  }
+
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+    return res.status(400).json({ error: 'Tipo de imagem não suportado' });
+  }
+
+  // Limit base64 payload to ~10 MB
+  if (imageBase64.length > 14_000_000) {
+    return res.status(400).json({ error: 'Imagem muito grande (máx. ~10 MB)' });
+  }
+
+  const media = new MessageMedia(mimeType, imageBase64);
+  const results = [];
+
+  for (const contact of contacts) {
+    try {
+      const phone = formatPhone(contact.phone);
+
+      const numberId = await client.getNumberId(phone);
+      if (!numberId) {
+        throw new Error(`Número ${contact.phone} não encontrado no WhatsApp`);
+      }
+
+      await client.sendMessage(numberId._serialized, media, { caption: contact.message || '' });
+
+      results.push({ name: contact.name, phone: contact.phone, success: true });
+      console.log(`✅ Imagem enviada para ${contact.name} (${contact.phone})`);
 
       // Delay entre mensagens para evitar bloqueio (1.5 a 3 segundos)
       const delay = 1500 + Math.random() * 1500;
