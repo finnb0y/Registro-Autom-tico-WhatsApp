@@ -294,6 +294,8 @@ export default function Home() {
   const [massaCadastrosFile, setMassaCadastrosFile] = useState<string | null>(null);
   const [massaCadastrosError, setMassaCadastrosError] = useState<string | null>(null);
   const [massaMessage, setMassaMessage] = useState('');
+  const [massaImage, setMassaImage] = useState<File | null>(null);
+  const [massaImagePreview, setMassaImagePreview] = useState<string | null>(null);
   const [massaResults, setMassaResults] = useState<SendResult[]>([]);
   const [massaIsSending, setMassaIsSending] = useState(false);
   const [massaIsDone, setMassaIsDone] = useState(false);
@@ -573,7 +575,8 @@ export default function Home() {
   }
 
   async function sendMassMessages() {
-    if (!waStatus.connected || !massaCadastrosData || !massaMessage.trim()) return;
+    if (!waStatus.connected || !massaCadastrosData) return;
+    if (!massaImage && !massaMessage.trim()) return;
     setMassaIsSending(true);
     setMassaResults([]);
 
@@ -590,11 +593,29 @@ export default function Home() {
       }));
 
     try {
-      const res = await fetch(`${SERVER_URL}/send`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ contacts: payload }),
-      });
+      let res;
+      if (massaImage) {
+        const imageBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = () => reject(new Error('Falha ao ler o arquivo de imagem'));
+          reader.readAsDataURL(massaImage);
+        });
+        res = await fetch(`${SERVER_URL}/send-image`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ contacts: payload, imageBase64, mimeType: massaImage.type }),
+        });
+      } else {
+        res = await fetch(`${SERVER_URL}/send`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ contacts: payload }),
+        });
+      }
       const data = await res.json();
       setMassaResults(data.results || []);
       setMassaIsDone(true);
@@ -825,6 +846,47 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Image upload */}
+          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-3">
+            <h2 className="font-semibold text-gray-800">🖼️ Imagem (opcional)</h2>
+            <p className="text-xs text-gray-400">Opcional: adicione uma imagem. O texto acima será enviado como legenda.</p>
+            {massaImagePreview ? (
+              <div className="flex flex-col gap-2">
+                <img src={massaImagePreview} alt="Preview" className="max-h-48 rounded-lg border border-gray-200 object-contain" />
+                <button
+                  onClick={() => { if (massaImagePreview) URL.revokeObjectURL(massaImagePreview); setMassaImage(null); setMassaImagePreview(null); }}
+                  className="self-start text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors"
+                >
+                  Remover imagem
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors">
+                <span className="text-2xl mb-1">📎</span>
+                <span className="text-xs text-gray-500">Clique para selecionar uma imagem</span>
+                <span className="text-xs text-gray-400">.jpg, .jpeg, .png, .gif, .webp</span>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.gif,.webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setMassaImage(file);
+                    if (file) {
+                      setMassaImagePreview((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return URL.createObjectURL(file);
+                      });
+                    } else {
+                      setMassaImagePreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
+          </div>
+
           {/* Send button */}
           <div className="bg-white rounded-xl shadow-sm border p-5 flex items-center justify-between">
             {!waStatus.connected && (
@@ -833,9 +895,9 @@ export default function Home() {
             {waStatus.connected && <p className="text-sm text-gray-500" />}
             <button
               onClick={sendMassMessages}
-              disabled={massaIsSending || !waStatus.connected || !massaCadastrosData || !massaMessage.trim()}
+              disabled={massaIsSending || !waStatus.connected || !massaCadastrosData || (!massaImage && !massaMessage.trim())}
               className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all
-                ${massaIsSending || !waStatus.connected || !massaCadastrosData || !massaMessage.trim()
+                ${massaIsSending || !waStatus.connected || !massaCadastrosData || (!massaImage && !massaMessage.trim())
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
                 }`}
@@ -1008,49 +1070,51 @@ export default function Home() {
               <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code></p>
             </div>
 
-            {/* Cash Game */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Cash Game</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Cash Game */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Cash Game</label>
+                </div>
+                <textarea
+                  value={cashTemplate}
+                  onChange={(e) => setCashTemplate(e.target.value)}
+                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  style={{ background: '#d1fae5', borderColor: '#065f46' }}
+                />
+                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;gastoCashGame&gt;</code></p>
               </div>
-              <textarea
-                value={cashTemplate}
-                onChange={(e) => setCashTemplate(e.target.value)}
-                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-green-600"
-                style={{ background: '#d1fae5', borderColor: '#065f46' }}
-              />
-              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;gastoCashGame&gt;</code></p>
-            </div>
 
-            {/* Torneio */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Torneio</label>
+              {/* Torneio */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Torneio</label>
+                </div>
+                <textarea
+                  value={torneioTemplate}
+                  onChange={(e) => setTorneioTemplate(e.target.value)}
+                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  style={{ background: '#dbeafe', borderColor: '#1e40af' }}
+                />
+                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTorneio&gt;</code></p>
               </div>
-              <textarea
-                value={torneioTemplate}
-                onChange={(e) => setTorneioTemplate(e.target.value)}
-                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                style={{ background: '#dbeafe', borderColor: '#1e40af' }}
-              />
-              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTorneio&gt;</code></p>
-            </div>
 
-            {/* Bar */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Bar</label>
+              {/* Bar */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Bar</label>
+                </div>
+                <textarea
+                  value={barTemplate}
+                  onChange={(e) => setBarTemplate(e.target.value)}
+                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-pink-700"
+                  style={{ background: '#fce7f3', borderColor: '#9d174d' }}
+                />
+                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoBar&gt;</code></p>
               </div>
-              <textarea
-                value={barTemplate}
-                onChange={(e) => setBarTemplate(e.target.value)}
-                className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-pink-700"
-                style={{ background: '#fce7f3', borderColor: '#9d174d' }}
-              />
-              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoBar&gt;</code></p>
             </div>
 
             {/* Rodapé */}
