@@ -1082,7 +1082,7 @@ export default function Home() {
 
         {/* Construtor de mensagem */}
         <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 overflow-hidden">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-emerald-900/40 flex items-center justify-between">
             <h2 className="font-semibold text-slate-100">✏️ Construtor de mensagem</h2>
             <button
               onClick={() => {
@@ -1178,14 +1178,16 @@ export default function Home() {
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide text-center">
                   Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
                 </p>
-                {/* Phone shell */}
+                {/* Phone outer casing (black frame) */}
                 <div
-                  className="flex-1 rounded-3xl border-4 border-slate-600 bg-[#0b1f14] overflow-y-auto p-4 text-sm space-y-1"
-                  style={{ minHeight: '520px' }}
+                  className="flex-1 rounded-[28px] bg-black p-[10px] shadow-xl"
+                  style={{ minHeight: '560px' }}
                 >
+                  {/* Phone screen (white inner area) */}
+                  <div className="rounded-2xl bg-white overflow-y-auto h-full p-4 text-sm space-y-1" style={{ minHeight: '500px' }}>
                   {/* Header */}
                   <div
-                    className="text-slate-100 mb-2 text-xs leading-snug"
+                    className="text-gray-900 mb-2 text-xs leading-snug"
                     dangerouslySetInnerHTML={{
                       __html: whatsAppToHtml(headerTemplate.replace(/<nome>/g, exampleContact.name)),
                     }}
@@ -1253,7 +1255,7 @@ export default function Home() {
 
                   {/* Footer */}
                   <div
-                    className="text-slate-100 mt-2 text-xs leading-snug"
+                    className="text-gray-900 mt-2 text-xs leading-snug"
                     dangerouslySetInnerHTML={{
                       __html: whatsAppToHtml(
                         footerTemplate
@@ -1262,6 +1264,7 @@ export default function Home() {
                       ),
                     }}
                   />
+                  </div>
                 </div>
               </div>
             </div>
