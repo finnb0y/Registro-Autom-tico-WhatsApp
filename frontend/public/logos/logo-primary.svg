@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60" width="220" height="60">
+  <!-- Club suit icon -->
+  <g transform="translate(8, 6)">
+    <!-- Top left circle -->
+    <circle cx="18" cy="18" r="9" fill="#10b981"/>
+    <!-- Top right circle -->
+    <circle cx="30" cy="18" r="9" fill="#10b981"/>
+    <!-- Bottom center circle -->
+    <circle cx="24" cy="26" r="9" fill="#10b981"/>
+    <!-- Stem -->
+    <rect x="20" y="33" width="8" height="8" rx="1" fill="#10b981"/>
+    <rect x="15" y="39" width="18" height="4" rx="2" fill="#10b981"/>
+  </g>
+  <!-- "QUADRA" text -->
+  <text x="58" y="26" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="2" fill="#10b981">QUADRA</text>
+  <!-- "POKER CLUB" text -->
+  <text x="59" y="46" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="400" letter-spacing="3" fill="#6ee7b7">POKER CLUB</text>
+</svg>

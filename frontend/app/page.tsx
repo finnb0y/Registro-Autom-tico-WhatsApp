@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
-import { BarChart3, Send, FileSpreadsheet, Users } from 'lucide-react';
+import { BarChart3, Send } from 'lucide-react';
 import Header from '@/components/Header';
 import WhatsAppConnect from '@/components/WhatsAppConnect';
 import FeatureCard from '@/components/FeatureCard';
@@ -709,19 +709,6 @@ export default function Home() {
   const massaSuccessCount = massaResults.filter((r) => r.success).length;
   const massaErrorCount   = massaResults.filter((r) => !r.success).length;
 
-  // ─── WhatsApp status badge (shared) ──────────────────────────────────────────
-
-  const waBadge = (
-    <div className="flex items-center gap-2 bg-white border rounded-lg px-4 py-2 shadow-sm">
-      <span className={`w-2.5 h-2.5 rounded-full ${waStatus.connected ? 'bg-green-500' : 'bg-red-400'}`} />
-      <span className="text-sm font-medium text-gray-700">
-        {waStatus.connected
-          ? `WhatsApp conectado ${waStatus.phone ? `(+${waStatus.phone})` : ''}`
-          : 'WhatsApp desconectado'}
-      </span>
-    </div>
-  );
-
   // ─── QR Code block (shared) ───────────────────────────────────────────────────
 
   const qrBlock = !waStatus.connected && (
@@ -778,18 +765,6 @@ export default function Home() {
               iconColor="bg-whatsapp"
               onClick={() => setMode('envio-massa')}
             />
-            <FeatureCard
-              icon={FileSpreadsheet}
-              title="Gestão de Planilhas"
-              description="Importe, visualize e gerencie suas planilhas de cadastro de jogadores, resultados e movimentações."
-              iconColor="bg-primary"
-            />
-            <FeatureCard
-              icon={Users}
-              title="Jogadores"
-              description="Consulte o histórico de cada jogador, incluindo partidas, resultados e informações de contato."
-              iconColor="bg-gold"
-            />
           </div>
         </main>
       </div>
@@ -799,22 +774,20 @@ export default function Home() {
   // ── Envio em Massa screen ────────────────────────────────────────────────────
   if (mode === 'envio-massa') {
     return (
-      <main className="min-h-screen bg-gray-50 py-10 px-4">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setMode(null)}
-                className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-400 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                ← Voltar
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">📨 Envio em Massa</h1>
-                <p className="text-gray-500 text-sm mt-0.5">Envie a mesma mensagem para todos os contatos</p>
-              </div>
+      <div className="min-h-screen bg-felt text-slate-100">
+        <Header waStatus={waStatus} />
+        <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMode(null)}
+              className="text-sm text-slate-400 hover:text-slate-100 border border-emerald-900/40 hover:border-emerald-700 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              ← Voltar
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-100">📨 Envio em Massa</h1>
+              <p className="text-slate-400 text-sm mt-0.5">Envie a mesma mensagem para todos os contatos</p>
             </div>
-            {waBadge}
           </div>
 
           {qrBlock}
@@ -957,31 +930,29 @@ export default function Home() {
               </div>
             </div>
           )}
-        </div>
-      </main>
+        </main>
+      </div>
     );
   }
 
   // ── Resumos Diários screen ───────────────────────────────────────────────────
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-felt text-slate-100">
+      <Header waStatus={waStatus} />
+      <main className="max-w-5xl mx-auto px-6 py-10 space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMode(null)}
-              className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-400 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              ← Voltar
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">📊 Resumos Diários</h1>
-              <p className="text-gray-500 text-sm mt-0.5">Envie o resumo de consumo do dia pelo WhatsApp</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMode(null)}
+            className="text-sm text-slate-400 hover:text-slate-100 border border-emerald-900/40 hover:border-emerald-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ← Voltar
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-100">📊 Resumos Diários</h1>
+            <p className="text-slate-400 text-sm mt-0.5">Envie o resumo de consumo do dia pelo WhatsApp</p>
           </div>
-          {waBadge}
         </div>
 
         {/* QR Code */}
@@ -1327,7 +1298,7 @@ export default function Home() {
           </div>
         )}
 
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
