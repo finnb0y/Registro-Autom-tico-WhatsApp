@@ -166,7 +166,7 @@ function UploadZone({
     <div className="flex flex-col gap-1">
       <div
         className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
-          ${loaded ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+          ${loaded ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
@@ -185,10 +185,10 @@ function UploadZone({
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
         />
         <div className="text-2xl mb-1">{loaded ? '✅' : icon}</div>
-        <p className="text-xs font-semibold text-gray-700">
+        <p className="text-xs font-semibold text-slate-200">
           {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         </p>
-        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[130px] mx-auto">
+        <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[130px] mx-auto">
           {fileName ?? 'Clique ou arraste'}
         </p>
       </div>
@@ -221,7 +221,7 @@ function MultiUploadZone({
     <div className="flex flex-col gap-2">
       <div
         className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
-          ${files.length > 0 ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+          ${files.length > 0 ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
@@ -244,8 +244,8 @@ function MultiUploadZone({
           }}
         />
         <div className="text-2xl mb-1">{files.length > 0 ? '✅' : icon}</div>
-        <p className="text-xs font-semibold text-gray-700">{label}</p>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-xs font-semibold text-slate-200">{label}</p>
+        <p className="text-xs text-slate-400 mt-0.5">
           {files.length > 0 ? `${files.length} arquivo${files.length !== 1 ? 's' : ''}` : '+ Adicionar'}
         </p>
       </div>
@@ -253,11 +253,11 @@ function MultiUploadZone({
         <ul className="flex flex-col gap-1">
           {files.map((f, i) => (
             <li key={i} className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
-                <span className="text-xs text-gray-700 flex-1 truncate">{f.name}</span>
+              <div className="flex items-center gap-1 bg-emerald-950/20 border border-emerald-900/30 rounded-lg px-2 py-1">
+                <span className="text-xs text-slate-200 flex-1 truncate">{f.name}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove(i); }}
-                  className="text-gray-400 hover:text-red-500 font-bold text-sm w-5 h-5 rounded-full hover:bg-red-50 shrink-0"
+                  className="text-slate-400 hover:text-red-500 font-bold text-sm w-5 h-5 rounded-full hover:bg-red-900/30 shrink-0"
                   title="Remover"
                 >
                   ×
@@ -712,17 +712,17 @@ export default function Home() {
   // ─── QR Code block (shared) ───────────────────────────────────────────────────
 
   const qrBlock = !waStatus.connected && (
-    <div className="bg-white border rounded-xl shadow-sm p-6 flex flex-col items-center gap-4">
-      <h2 className="text-lg font-semibold text-gray-800">Conecte o WhatsApp</h2>
+    <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl shadow-sm p-6 flex flex-col items-center gap-4">
+      <h2 className="text-lg font-semibold text-slate-100">Conecte o WhatsApp</h2>
       {qrImage ? (
         <>
-          <p className="text-gray-500 text-sm text-center">
+          <p className="text-slate-300 text-sm text-center">
             Abra o WhatsApp no celular → Menu (⋮) → Aparelhos conectados → Conectar aparelho
           </p>
           <img src={qrImage} alt="QR Code WhatsApp" className="w-56 h-56 rounded-lg border" />
         </>
       ) : (
-        <p className="text-gray-400 text-sm">Aguardando QR Code do servidor…</p>
+        <p className="text-slate-300 text-sm">Aguardando QR Code do servidor…</p>
       )}
     </div>
   );
@@ -793,8 +793,8 @@ export default function Home() {
           {qrBlock}
 
           {/* Cadastros upload */}
-          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800">📤 Planilha de Contatos</h2>
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5 space-y-4">
+            <h2 className="font-semibold text-slate-100">📤 Planilha de Contatos</h2>
             <div className="max-w-xs">
               <UploadZone
                 label="Cadastros"
@@ -814,27 +814,27 @@ export default function Home() {
           </div>
 
           {/* Message textarea */}
-          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-3">
-            <h2 className="font-semibold text-gray-800">✉️ Mensagem</h2>
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5 space-y-3">
+            <h2 className="font-semibold text-slate-100">✉️ Mensagem</h2>
             <textarea
               value={massaMessage}
               onChange={(e) => setMassaMessage(e.target.value)}
               placeholder={"Digite a mensagem que será enviada a todos os contatos…\n\nUse <nome> para personalizar com o nome de cada contato."}
               rows={8}
-              className="w-full font-mono text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              className="w-full font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100 placeholder-slate-500"
             />
-            <p className="text-xs text-gray-400">
-              Opcional: use <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code> para inserir o nome do contato na mensagem.
+            <p className="text-xs text-slate-400">
+              Opcional: use <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code> para inserir o nome do contato na mensagem.
             </p>
           </div>
 
           {/* Image upload */}
-          <div className="bg-white rounded-xl shadow-sm border p-5 space-y-3">
-            <h2 className="font-semibold text-gray-800">🖼️ Imagem (opcional)</h2>
-            <p className="text-xs text-gray-400">Opcional: adicione uma imagem. O texto acima será enviado como legenda.</p>
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5 space-y-3">
+            <h2 className="font-semibold text-slate-100">🖼️ Imagem (opcional)</h2>
+            <p className="text-xs text-slate-400">Opcional: adicione uma imagem. O texto acima será enviado como legenda.</p>
             {massaImagePreview ? (
               <div className="flex flex-col gap-2">
-                <img src={massaImagePreview} alt="Preview" className="max-h-48 rounded-lg border border-gray-200 object-contain" />
+                <img src={massaImagePreview} alt="Preview" className="max-h-48 rounded-lg border border-emerald-900/30 object-contain" />
                 <button
                   onClick={() => { if (massaImagePreview) URL.revokeObjectURL(massaImagePreview); setMassaImage(null); setMassaImagePreview(null); }}
                   className="self-start text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors"
@@ -843,10 +843,10 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-emerald-900/40 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-900/20 transition-colors">
                 <span className="text-2xl mb-1">📎</span>
-                <span className="text-xs text-gray-500">Clique para selecionar uma imagem</span>
-                <span className="text-xs text-gray-400">.jpg, .jpeg, .png, .gif, .webp</span>
+                <span className="text-xs text-slate-400">Clique para selecionar uma imagem</span>
+                <span className="text-xs text-slate-500">.jpg, .jpeg, .png, .gif, .webp</span>
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png,.gif,.webp"
@@ -870,17 +870,17 @@ export default function Home() {
           </div>
 
           {/* Send button */}
-          <div className="bg-white rounded-xl shadow-sm border p-5 flex items-center justify-between">
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5 flex items-center justify-between">
             {!waStatus.connected && (
               <p className="text-sm text-amber-600">⚠️ Conecte o WhatsApp antes de enviar</p>
             )}
-            {waStatus.connected && <p className="text-sm text-gray-500" />}
+            {waStatus.connected && <p className="text-sm text-slate-400" />}
             <button
               onClick={sendMassMessages}
               disabled={massaIsSending || !waStatus.connected || !massaCadastrosData || (!massaImage && !massaMessage.trim())}
               className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all
                 ${massaIsSending || !waStatus.connected || !massaCadastrosData || (!massaImage && !massaMessage.trim())
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
                 }`}
             >
@@ -892,17 +892,17 @@ export default function Home() {
 
           {/* Results */}
           {massaIsDone && massaResults.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 overflow-hidden">
               <div className="px-5 py-4 border-b">
-                <h2 className="font-semibold text-gray-800">Resultado do envio</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h2 className="font-semibold text-slate-100">Resultado do envio</h2>
+                <p className="text-sm text-slate-400 mt-0.5">
                   ✅ {massaSuccessCount} enviado{massaSuccessCount !== 1 ? 's' : ''}&nbsp;&nbsp;
                   {massaErrorCount > 0 && <>❌ {massaErrorCount} com erro</>}
                 </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <thead className="bg-emerald-900/20 text-slate-400 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3 text-left">Nome</th>
                       <th className="px-4 py-3 text-left">Telefone</th>
@@ -910,11 +910,11 @@ export default function Home() {
                       <th className="px-4 py-3 text-left">Detalhe</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-emerald-900/20">
                     {massaResults.map((r, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">{r.name}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.phone}</td>
+                      <tr key={i} className="hover:bg-emerald-900/20">
+                        <td className="px-4 py-3 font-medium text-slate-100">{r.name}</td>
+                        <td className="px-4 py-3 text-slate-300">{r.phone}</td>
                         <td className="px-4 py-3 text-center">
                           {r.success ? (
                             <span className="text-green-600 font-semibold">✅ Enviado</span>
@@ -922,7 +922,7 @@ export default function Home() {
                             <span className="text-red-500 font-semibold">❌ Erro</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{r.error || '—'}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs">{r.error || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -959,8 +959,8 @@ export default function Home() {
         {qrBlock}
 
         {/* Planilhas */}
-        <div className="bg-white rounded-xl shadow-sm border p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">📤 Planilhas</h2>
+        <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5">
+          <h2 className="font-semibold text-slate-100 mb-4">📤 Planilhas</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <UploadZone
               label="Cadastros"  icon="📋"
@@ -992,7 +992,7 @@ export default function Home() {
               disabled={!canMerge}
               className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all
                 ${!canMerge
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
                 }`}
             >
@@ -1021,9 +1021,9 @@ export default function Home() {
         </div>
 
         {/* Construtor de mensagem */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 overflow-hidden">
           <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">✏️ Construtor de mensagem</h2>
+            <h2 className="font-semibold text-slate-100">✏️ Construtor de mensagem</h2>
             <button
               onClick={() => {
                 setHeaderTemplate(DEFAULT_HEADER);
@@ -1032,7 +1032,7 @@ export default function Home() {
                 setBarTemplate(DEFAULT_BAR);
                 setFooterTemplate(DEFAULT_FOOTER);
               }}
-              className="text-xs text-gray-500 hover:text-green-700 border border-gray-200 hover:border-green-400 px-3 py-1 rounded-lg transition-colors"
+              className="text-xs text-slate-400 hover:text-green-400 border border-emerald-900/30 hover:border-green-500 px-3 py-1 rounded-lg transition-colors"
             >
               Restaurar padrão
             </button>
@@ -1041,13 +1041,13 @@ export default function Home() {
           <div className="p-5 space-y-4">
             {/* Cabeçalho */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cabeçalho</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cabeçalho</label>
               <textarea
                 value={headerTemplate}
                 onChange={(e) => setHeaderTemplate(e.target.value)}
-                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
               />
-              <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;nome&gt;</code></p>
+              <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code></p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1055,7 +1055,7 @@ export default function Home() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Cash Game</label>
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Cash Game</label>
                 </div>
                 <textarea
                   value={cashTemplate}
@@ -1063,14 +1063,14 @@ export default function Home() {
                   className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-green-600"
                   style={{ background: '#d1fae5', borderColor: '#065f46' }}
                 />
-                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;gastoCashGame&gt;</code></p>
+                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;gastoCashGame&gt;</code></p>
               </div>
 
               {/* Torneio */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Torneio</label>
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Torneio</label>
                 </div>
                 <textarea
                   value={torneioTemplate}
@@ -1078,14 +1078,14 @@ export default function Home() {
                   className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-blue-600"
                   style={{ background: '#dbeafe', borderColor: '#1e40af' }}
                 />
-                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoTorneio&gt;</code></p>
+                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTorneio&gt;</code></p>
               </div>
 
               {/* Bar */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Bar</label>
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Bar</label>
                 </div>
                 <textarea
                   value={barTemplate}
@@ -1093,28 +1093,28 @@ export default function Home() {
                   className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-pink-700"
                   style={{ background: '#fce7f3', borderColor: '#9d174d' }}
                 />
-                <p className="text-xs text-gray-400">Variável: <code className="bg-gray-100 rounded px-1">&lt;saldoBar&gt;</code></p>
+                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoBar&gt;</code></p>
               </div>
             </div>
 
             {/* Rodapé */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rodapé</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Rodapé</label>
               <textarea
                 value={footerTemplate}
                 onChange={(e) => setFooterTemplate(e.target.value)}
-                className="font-mono text-sm border border-gray-200 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
               />
-              <p className="text-xs text-gray-400">Variáveis: <code className="bg-gray-100 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-gray-100 rounded px-1">&lt;saldoTotal&gt;</code></p>
+              <p className="text-xs text-slate-400">Variáveis: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTotal&gt;</code></p>
             </div>
 
             {/* Pré-visualização */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <div className="border border-emerald-900/30 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-emerald-950/20 border-b border-emerald-900/20 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
               </div>
               <div className="p-4 space-y-1 text-sm">
-                <div className="whitespace-pre-wrap text-gray-700 mb-2">
+                <div className="whitespace-pre-wrap text-slate-200 mb-2">
                   {headerTemplate.replace(/<nome>/g, exampleContact.name)}
                 </div>
 
@@ -1126,7 +1126,7 @@ export default function Home() {
                     opacity:    hasCash || !previewContact ? 1 : 0.4,
                   }}
                 >
-                  <span className="flex-1 text-gray-700">
+                  <span className="flex-1 text-slate-200">
                     {cashTemplate.replace(/<gastoCashGame>/g, formatCurrency(exampleContact.gastoCashGame))}
                   </span>
                   <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#059669' }}>
@@ -1142,7 +1142,7 @@ export default function Home() {
                     opacity:    hasTorneio || !previewContact ? 1 : 0.4,
                   }}
                 >
-                  <span className="flex-1 text-gray-700">
+                  <span className="flex-1 text-slate-200">
                     {torneioTemplate.replace(/<saldoTorneio>/g, formatCurrency(exampleContact.saldoTorneio))}
                   </span>
                   <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#2563eb' }}>
@@ -1158,7 +1158,7 @@ export default function Home() {
                     opacity:    hasBar || !previewContact ? 1 : 0.4,
                   }}
                 >
-                  <span className="flex-1 text-gray-700">
+                  <span className="flex-1 text-slate-200">
                     {barTemplate.replace(/<saldoBar>/g, formatCurrency(exampleContact.saldoBar))}
                   </span>
                   <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#9d174d' }}>
@@ -1166,7 +1166,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="whitespace-pre-wrap text-gray-700 mt-2">
+                <div className="whitespace-pre-wrap text-slate-200 mt-2">
                   {footerTemplate
                     .replace(/<saldoDia>/g, formatCurrency(exampleContact.saldoDia))
                     .replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal))}
@@ -1178,17 +1178,17 @@ export default function Home() {
 
         {/* Tabela de contatos */}
         {contacts.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">
+              <h2 className="font-semibold text-slate-100">
                 {contacts.length} contato{contacts.length !== 1 ? 's' : ''} para envio
               </h2>
-              <span className="text-xs text-gray-400">Clique em × para remover</span>
+              <span className="text-xs text-slate-400">Clique em × para remover</span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                <thead className="bg-emerald-900/20 text-slate-400 text-xs uppercase tracking-wide">
                   <tr>
                     <th className="px-4 py-3 text-left">Nome</th>
                     <th className="px-4 py-3 text-left">Telefone</th>
@@ -1200,30 +1200,30 @@ export default function Home() {
                     <th className="px-4 py-3 text-center">Remover</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-emerald-900/20">
                   {contacts.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{c.phone}</td>
-                      <td className="px-4 py-3 text-right text-gray-800">
+                    <tr key={c.id} className="hover:bg-emerald-900/20 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-100">{c.name}</td>
+                      <td className="px-4 py-3 text-slate-300">{c.phone}</td>
+                      <td className="px-4 py-3 text-right text-slate-100">
                         {formatOptionalCurrency(c.gastoCashGame)}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
+                      <td className="px-4 py-3 text-right text-slate-100">
                         {formatOptionalCurrency(c.saldoTorneio)}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
+                      <td className="px-4 py-3 text-right text-slate-100">
                         {formatOptionalCurrency(c.saldoBar)}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
+                      <td className="px-4 py-3 text-right text-slate-100">
                         {formatOptionalCurrency(c.saldoDia)}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
+                      <td className="px-4 py-3 text-right text-slate-100">
                         {formatOptionalCurrency(c.saldoTotal)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => removeContact(c.id)}
-                          className="text-gray-400 hover:text-red-500 transition-colors font-bold text-base w-7 h-7 rounded-full hover:bg-red-50"
+                          className="text-slate-400 hover:text-red-500 transition-colors font-bold text-base w-7 h-7 rounded-full hover:bg-red-900/30"
                         >
                           ×
                         </button>
@@ -1235,17 +1235,17 @@ export default function Home() {
             </div>
 
             {/* Botão de envio */}
-            <div className="px-5 py-4 border-t bg-gray-50 flex items-center justify-between">
+            <div className="px-5 py-4 border-t border-emerald-900/20 bg-emerald-950/20 flex items-center justify-between">
               {!waStatus.connected && (
                 <p className="text-sm text-amber-600">⚠️ Conecte o WhatsApp antes de enviar</p>
               )}
-              {waStatus.connected && <p className="text-sm text-gray-500" />}
+              {waStatus.connected && <p className="text-sm text-slate-400" />}
               <button
                 onClick={sendMessages}
                 disabled={isSending || !waStatus.connected || contacts.length === 0}
                 className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all
                   ${isSending || !waStatus.connected || contacts.length === 0
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
                   }`}
               >
@@ -1259,17 +1259,17 @@ export default function Home() {
 
         {/* Resultados */}
         {isDone && results.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 overflow-hidden">
             <div className="px-5 py-4 border-b">
-              <h2 className="font-semibold text-gray-800">Resultado do envio</h2>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h2 className="font-semibold text-slate-100">Resultado do envio</h2>
+              <p className="text-sm text-slate-400 mt-0.5">
                 ✅ {successCount} enviado{successCount !== 1 ? 's' : ''}&nbsp;&nbsp;
                 {errorCount > 0 && <>❌ {errorCount} com erro</>}
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <thead className="bg-emerald-900/20 text-slate-400 text-xs uppercase">
                   <tr>
                     <th className="px-4 py-3 text-left">Nome</th>
                     <th className="px-4 py-3 text-left">Telefone</th>
@@ -1277,11 +1277,11 @@ export default function Home() {
                     <th className="px-4 py-3 text-left">Detalhe</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-emerald-900/20">
                   {results.map((r, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800">{r.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.phone}</td>
+                    <tr key={i} className="hover:bg-emerald-900/20">
+                      <td className="px-4 py-3 font-medium text-slate-100">{r.name}</td>
+                      <td className="px-4 py-3 text-slate-300">{r.phone}</td>
                       <td className="px-4 py-3 text-center">
                         {r.success ? (
                           <span className="text-green-600 font-semibold">✅ Enviado</span>
@@ -1289,7 +1289,7 @@ export default function Home() {
                           <span className="text-red-500 font-semibold">❌ Erro</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">{r.error || '—'}</td>
+                      <td className="px-4 py-3 text-slate-400 text-xs">{r.error || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
