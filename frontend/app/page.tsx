@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { BarChart3, Send, FileSpreadsheet, Users } from 'lucide-react';
+import Header from '@/components/Header';
+import WhatsAppConnect from '@/components/WhatsAppConnect';
+import FeatureCard from '@/components/FeatureCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -741,49 +745,54 @@ export default function Home() {
   // ── Mode selection screen ────────────────────────────────────────────────────
   if (mode === null) {
     return (
-      <main className="min-h-screen bg-gray-50 py-10 px-4">
-        <div className="max-w-3xl mx-auto space-y-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">♣️ Quadra Poker Club</h1>
-              <p className="text-gray-500 text-sm mt-0.5">Selecione o modo de uso</p>
-            </div>
-            {waBadge}
+      <div className="min-h-screen bg-felt text-slate-100">
+        <Header waStatus={waStatus} />
+        <main className="max-w-5xl mx-auto px-6 py-12 space-y-10 relative">
+          {/* soft green glow */}
+          <div className="pointer-events-none absolute inset-0 -z-10">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#04160e]" />
+            <div
+              className="absolute left-1/2 -translate-x-1/2 top-24 w-[780px] h-[420px] rounded-full opacity-10"
+              style={{
+                filter: 'blur(32px)',
+                background:
+                  'radial-gradient(circle at 30% 30%, #10b981, rgba(16,185,129,0.06) 40%, transparent 70%)',
+              }}
+            />
           </div>
-          {qrBlock}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Resumos Diários */}
-            <button
-              onClick={() => setMode('resumos')}
-              className="group bg-white border-2 border-gray-200 hover:border-blue-400 rounded-2xl p-8 text-left shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="text-5xl mb-4">📊</div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Resumos Diários</h2>
-              <p className="text-gray-500 text-sm leading-relaxed">
-                Faça upload das planilhas de Cadastros, Cash Game, Torneio e Bar, mescle os dados e envie mensagens personalizadas para cada jogador.
-              </p>
-              <div className="mt-4 text-blue-600 text-sm font-semibold group-hover:underline">
-                Entrar →
-              </div>
-            </button>
 
-            {/* Envio em Massa */}
-            <button
+          <WhatsAppConnect waStatus={waStatus} qrImage={qrImage} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FeatureCard
+              icon={BarChart3}
+              title="Resumos Diários"
+              description="Faça upload das planilhas de Cadastros, Cash Game, Torneio e Bar, mescle os dados e envie mensagens personalizadas para cada jogador."
+              iconColor="bg-accent"
+              onClick={() => setMode('resumos')}
+            />
+            <FeatureCard
+              icon={Send}
+              title="Envio em Massa"
+              description="Digite uma mensagem e envie para todos os contatos de uma planilha de Cadastros de uma só vez."
+              iconColor="bg-whatsapp"
               onClick={() => setMode('envio-massa')}
-              className="group bg-white border-2 border-gray-200 hover:border-purple-400 rounded-2xl p-8 text-left shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="text-5xl mb-4">📨</div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Envio em Massa</h2>
-              <p className="text-gray-500 text-sm leading-relaxed">
-                Digite uma mensagem e envie para todos os contatos de uma planilha de Cadastros de uma só vez.
-              </p>
-              <div className="mt-4 text-purple-600 text-sm font-semibold group-hover:underline">
-                Entrar →
-              </div>
-            </button>
+            />
+            <FeatureCard
+              icon={FileSpreadsheet}
+              title="Gestão de Planilhas"
+              description="Importe, visualize e gerencie suas planilhas de cadastro de jogadores, resultados e movimentações."
+              iconColor="bg-primary"
+            />
+            <FeatureCard
+              icon={Users}
+              title="Jogadores"
+              description="Consulte o histórico de cada jogador, incluindo partidas, resultados e informações de contato."
+              iconColor="bg-gold"
+            />
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     );
   }
 
