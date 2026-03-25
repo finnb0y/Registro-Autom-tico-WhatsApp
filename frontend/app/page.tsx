@@ -66,7 +66,7 @@ function findCol(row: RawRow, aliases: string[]): string | number | undefined {
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
-const DEFAULT_HEADER  = '📣 *Atualização de Saldo*\n\n👤 *Jogador:* <nome>';
+const DEFAULT_HEADER  = '📣 *Atualização de Saldo*\n👤 *Jogador:* <nome>';
 const DEFAULT_CASH    = '🎲 *Cash Game:* R$ <gastoCashGame>';
 const DEFAULT_TORNEIO = '🏆 *Torneio:* R$ <saldoTorneio>';
 const DEFAULT_BAR     = '🍺 *Bar:* R$ <saldoBar>';
@@ -90,6 +90,36 @@ function formatOptionalCurrency(value: string | number | undefined): string {
 /** Normalises a raw cell value: returns the value if non-empty, otherwise undefined. */
 function normalizeValue(val: string | number | undefined): string | number | undefined {
   return val !== undefined && val !== '' ? val : undefined;
+}
+
+/** Escapes HTML special characters to prevent XSS. */
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+const CODE_BG = '#1a2e23';
+
+/** Converts WhatsApp markdown formatting to safe HTML for preview rendering. */
+function whatsAppToHtml(raw: string): string {
+  let s = escapeHtml(raw);
+  // Code blocks: ```...```
+  s = s.replace(/```([\s\S]*?)```/g, `<pre style="background:${CODE_BG};border-radius:4px;padding:4px 8px;font-family:monospace;font-size:0.85em;white-space:pre-wrap;display:inline-block">$1</pre>`);
+  // Bold: *text*
+  s = s.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
+  // Italic: _text_
+  s = s.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+  // Strikethrough: ~text~
+  s = s.replace(/~([^~\n]+)~/g, '<s>$1</s>');
+  // Inline code: `text`
+  s = s.replace(/`([^`\n]+)`/g, `<code style="background:${CODE_BG};border-radius:3px;padding:1px 4px;font-family:monospace;font-size:0.9em">$1</code>`);
+  // Newlines to <br>
+  s = s.replace(/\n/g, '<br>');
+  return s;
 }
 
 /** Normaliza nome para comparação: minúsculas + sem acentos + sem espaços extras */
@@ -341,6 +371,36 @@ export default function Home() {
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
   }, [pollStatus]);
+
+  // ─── localStorage persistence for templates ───────────────────────────────────
+
+  const STORAGE_KEY = 'wa_template_settings';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.header   === 'string') setHeaderTemplate(parsed.header);
+        if (typeof parsed.cash     === 'string') setCashTemplate(parsed.cash);
+        if (typeof parsed.torneio  === 'string') setTorneioTemplate(parsed.torneio);
+        if (typeof parsed.bar      === 'string') setBarTemplate(parsed.bar);
+        if (typeof parsed.footer   === 'string') setFooterTemplate(parsed.footer);
+      }
+    } catch { /* ignore parse errors */ }
+  }, [setHeaderTemplate, setCashTemplate, setTorneioTemplate, setBarTemplate, setFooterTemplate]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        header:  headerTemplate,
+        cash:    cashTemplate,
+        torneio: torneioTemplate,
+        bar:     barTemplate,
+        footer:  footerTemplate,
+      }));
+    } catch { /* ignore quota errors */ }
+  }, [headerTemplate, cashTemplate, torneioTemplate, barTemplate, footerTemplate]);
 
   // ─── Manual merge ────────────────────────────────────────────────────────────
 
@@ -1031,6 +1091,7 @@ export default function Home() {
                 setTorneioTemplate(DEFAULT_TORNEIO);
                 setBarTemplate(DEFAULT_BAR);
                 setFooterTemplate(DEFAULT_FOOTER);
+                try { localStorage.removeItem('wa_template_settings'); } catch { /* ignore */ }
               }}
               className="text-xs text-slate-400 hover:text-green-400 border border-emerald-900/30 hover:border-green-500 px-3 py-1 rounded-lg transition-colors"
             >
@@ -1038,138 +1099,169 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="p-5 space-y-4">
-            {/* Cabeçalho */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cabeçalho</label>
-              <textarea
-                value={headerTemplate}
-                onChange={(e) => setHeaderTemplate(e.target.value)}
-                className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
-              />
-              <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code></p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Cash Game */}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Cash Game</label>
-                </div>
-                <textarea
-                  value={cashTemplate}
-                  onChange={(e) => setCashTemplate(e.target.value)}
-                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-green-600"
-                  style={{ background: '#d1fae5', borderColor: '#065f46' }}
-                />
-                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;gastoCashGame&gt;</code></p>
-              </div>
-
-              {/* Torneio */}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Torneio</label>
-                </div>
-                <textarea
-                  value={torneioTemplate}
-                  onChange={(e) => setTorneioTemplate(e.target.value)}
-                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  style={{ background: '#dbeafe', borderColor: '#1e40af' }}
-                />
-                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTorneio&gt;</code></p>
-              </div>
-
-              {/* Bar */}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Bar</label>
-                </div>
-                <textarea
-                  value={barTemplate}
-                  onChange={(e) => setBarTemplate(e.target.value)}
-                  className="font-mono text-sm border rounded-lg p-3 resize-none h-12 focus:outline-none focus:ring-1 focus:ring-pink-700"
-                  style={{ background: '#fce7f3', borderColor: '#9d174d' }}
-                />
-                <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoBar&gt;</code></p>
-              </div>
-            </div>
-
-            {/* Rodapé */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Rodapé</label>
-              <textarea
-                value={footerTemplate}
-                onChange={(e) => setFooterTemplate(e.target.value)}
-                className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-none h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
-              />
-              <p className="text-xs text-slate-400">Variáveis: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTotal&gt;</code></p>
-            </div>
-
-            {/* Pré-visualização */}
-            <div className="border border-emerald-900/30 rounded-xl overflow-hidden">
-              <div className="px-4 py-2 bg-emerald-950/20 border-b border-emerald-900/20 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
-              </div>
-              <div className="p-4 space-y-1 text-sm">
-                <div className="whitespace-pre-wrap text-slate-200 mb-2">
-                  {headerTemplate.replace(/<nome>/g, exampleContact.name)}
+          <div className="p-5">
+            <div className="flex gap-6 items-start">
+              {/* ─── Left: editor (takes more space) ─────────────────────────── */}
+              <div className="flex-1 min-w-0 space-y-4">
+                {/* Cabeçalho */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cabeçalho</label>
+                  <textarea
+                    value={headerTemplate}
+                    onChange={(e) => setHeaderTemplate(e.target.value)}
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                  />
+                  <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code></p>
                 </div>
 
-                {/* Cash Game segment */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Cash Game */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#059669' }}>CASH</span>
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Cash Game</label>
+                    </div>
+                    <textarea
+                      value={cashTemplate}
+                      onChange={(e) => setCashTemplate(e.target.value)}
+                      className="font-mono text-sm border rounded-lg p-3 resize-y h-20 focus:outline-none focus:ring-1 focus:ring-green-600"
+                      style={{ background: '#d1fae5', borderColor: '#065f46', color: '#064e3b' }}
+                    />
+                    <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;gastoCashGame&gt;</code></p>
+                  </div>
+
+                  {/* Torneio */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#2563eb' }}>TORNEIO</span>
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Torneio</label>
+                    </div>
+                    <textarea
+                      value={torneioTemplate}
+                      onChange={(e) => setTorneioTemplate(e.target.value)}
+                      className="font-mono text-sm border rounded-lg p-3 resize-y h-20 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      style={{ background: '#dbeafe', borderColor: '#1e40af', color: '#1e3a8a' }}
+                    />
+                    <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTorneio&gt;</code></p>
+                  </div>
+
+                  {/* Bar */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#9d174d' }}>BAR</span>
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Bar</label>
+                    </div>
+                    <textarea
+                      value={barTemplate}
+                      onChange={(e) => setBarTemplate(e.target.value)}
+                      className="font-mono text-sm border rounded-lg p-3 resize-y h-20 focus:outline-none focus:ring-1 focus:ring-pink-700"
+                      style={{ background: '#fce7f3', borderColor: '#9d174d', color: '#831843' }}
+                    />
+                    <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoBar&gt;</code></p>
+                  </div>
+                </div>
+
+                {/* Rodapé */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Rodapé</label>
+                  <textarea
+                    value={footerTemplate}
+                    onChange={(e) => setFooterTemplate(e.target.value)}
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-40 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                  />
+                  <p className="text-xs text-slate-400">Variáveis: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTotal&gt;</code></p>
+                </div>
+              </div>
+
+              {/* ─── Right: phone-like preview ────────────────────────────────── */}
+              <div className="w-64 shrink-0 flex flex-col gap-2 self-stretch">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide text-center">
+                  Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
+                </p>
+                {/* Phone shell */}
                 <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
-                  style={{
-                    background: hasCash || !previewContact ? '#d1fae5' : 'transparent',
-                    opacity:    hasCash || !previewContact ? 1 : 0.4,
-                  }}
+                  className="flex-1 rounded-3xl border-4 border-slate-600 bg-[#0b1f14] overflow-y-auto p-4 text-sm space-y-1"
+                  style={{ minHeight: '520px' }}
                 >
-                  <span className="flex-1 text-slate-200">
-                    {cashTemplate.replace(/<gastoCashGame>/g, formatCurrency(exampleContact.gastoCashGame))}
-                  </span>
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#059669' }}>
-                    {hasCash || !previewContact ? 'CASH' : 'CASH ❌'}
-                  </span>
-                </div>
+                  {/* Header */}
+                  <div
+                    className="text-slate-100 mb-2 text-xs leading-snug"
+                    dangerouslySetInnerHTML={{
+                      __html: whatsAppToHtml(headerTemplate.replace(/<nome>/g, exampleContact.name)),
+                    }}
+                  />
 
-                {/* Torneio segment */}
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
-                  style={{
-                    background: hasTorneio || !previewContact ? '#dbeafe' : 'transparent',
-                    opacity:    hasTorneio || !previewContact ? 1 : 0.4,
-                  }}
-                >
-                  <span className="flex-1 text-slate-200">
-                    {torneioTemplate.replace(/<saldoTorneio>/g, formatCurrency(exampleContact.saldoTorneio))}
-                  </span>
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#2563eb' }}>
-                    {hasTorneio || !previewContact ? 'TORNEIO' : 'TORNEIO ❌'}
-                  </span>
-                </div>
+                  {/* Cash Game segment */}
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                    style={{
+                      background: hasCash || !previewContact ? '#d1fae5' : 'transparent',
+                      opacity:    hasCash || !previewContact ? 1 : 0.4,
+                    }}
+                  >
+                    <span
+                      className="flex-1 text-xs leading-snug"
+                      style={{ color: '#064e3b' }}
+                      dangerouslySetInnerHTML={{
+                        __html: whatsAppToHtml(cashTemplate.replace(/<gastoCashGame>/g, formatCurrency(exampleContact.gastoCashGame))),
+                      }}
+                    />
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#059669' }}>
+                      {hasCash || !previewContact ? 'CASH' : 'CASH ❌'}
+                    </span>
+                  </div>
 
-                {/* Bar segment */}
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
-                  style={{
-                    background: hasBar || !previewContact ? '#fce7f3' : 'transparent',
-                    opacity:    hasBar || !previewContact ? 1 : 0.4,
-                  }}
-                >
-                  <span className="flex-1 text-slate-200">
-                    {barTemplate.replace(/<saldoBar>/g, formatCurrency(exampleContact.saldoBar))}
-                  </span>
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#9d174d' }}>
-                    {hasBar || !previewContact ? 'BAR' : 'BAR ❌'}
-                  </span>
-                </div>
+                  {/* Torneio segment */}
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                    style={{
+                      background: hasTorneio || !previewContact ? '#dbeafe' : 'transparent',
+                      opacity:    hasTorneio || !previewContact ? 1 : 0.4,
+                    }}
+                  >
+                    <span
+                      className="flex-1 text-xs leading-snug"
+                      style={{ color: '#1e3a8a' }}
+                      dangerouslySetInnerHTML={{
+                        __html: whatsAppToHtml(torneioTemplate.replace(/<saldoTorneio>/g, formatCurrency(exampleContact.saldoTorneio))),
+                      }}
+                    />
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#2563eb' }}>
+                      {hasTorneio || !previewContact ? 'TORNEIO' : 'TORNEIO ❌'}
+                    </span>
+                  </div>
 
-                <div className="whitespace-pre-wrap text-slate-200 mt-2">
-                  {footerTemplate
-                    .replace(/<saldoDia>/g, formatCurrency(exampleContact.saldoDia))
-                    .replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal))}
+                  {/* Bar segment */}
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-opacity"
+                    style={{
+                      background: hasBar || !previewContact ? '#fce7f3' : 'transparent',
+                      opacity:    hasBar || !previewContact ? 1 : 0.4,
+                    }}
+                  >
+                    <span
+                      className="flex-1 text-xs leading-snug"
+                      style={{ color: '#831843' }}
+                      dangerouslySetInnerHTML={{
+                        __html: whatsAppToHtml(barTemplate.replace(/<saldoBar>/g, formatCurrency(exampleContact.saldoBar))),
+                      }}
+                    />
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0 text-white" style={{ background: '#9d174d' }}>
+                      {hasBar || !previewContact ? 'BAR' : 'BAR ❌'}
+                    </span>
+                  </div>
+
+                  {/* Footer */}
+                  <div
+                    className="text-slate-100 mt-2 text-xs leading-snug"
+                    dangerouslySetInnerHTML={{
+                      __html: whatsAppToHtml(
+                        footerTemplate
+                          .replace(/<saldoDia>/g, formatCurrency(exampleContact.saldoDia))
+                          .replace(/<saldoTotal>/g, formatCurrency(exampleContact.saldoTotal)),
+                      ),
+                    }}
+                  />
                 </div>
               </div>
             </div>
