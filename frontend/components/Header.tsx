@@ -14,12 +14,9 @@ const Header = ({ waStatus }: HeaderProps) => {
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
-            src="/logos/logo-primary.png"
+            src="/logos/logo-primary.svg"
             alt="Quadra Poker Club"
-            className="h-9 w-auto object-contain"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
+            className="h-10 w-auto object-contain"
           />
           <div className="flex flex-col">
             <span className="text-lg font-semibold text-emerald-300">Quadra Poker Club</span>
