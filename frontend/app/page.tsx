@@ -1100,7 +1100,7 @@ export default function Home() {
           </div>
 
           <div className="p-5">
-            <div className="flex gap-6 items-start">
+            <div className="flex flex-col sm:flex-row gap-6 items-start">
               {/* ─── Left: editor (takes more space) ─────────────────────────── */}
               <div className="flex-1 min-w-0 space-y-4">
                 {/* Cabeçalho */}
@@ -1167,14 +1167,15 @@ export default function Home() {
                   <textarea
                     value={footerTemplate}
                     onChange={(e) => setFooterTemplate(e.target.value)}
-                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-40 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                    rows={9}
                   />
                   <p className="text-xs text-slate-400">Variáveis: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTotal&gt;</code></p>
                 </div>
               </div>
 
               {/* ─── Right: phone-like preview ────────────────────────────────── */}
-              <div className="w-64 shrink-0 flex flex-col gap-2 self-stretch">
+              <div className="w-full sm:w-64 shrink-0 flex flex-col gap-2 self-stretch">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide text-center">
                   Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
                 </p>

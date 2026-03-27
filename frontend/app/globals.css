@@ -8,6 +8,13 @@
   --ui-font: 'Rubik', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
+html,
+body {
+  overflow-x: hidden;
+  background-color: #04160e;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   font-family: var(--ui-font);
 }

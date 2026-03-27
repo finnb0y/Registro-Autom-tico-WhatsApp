@@ -18,10 +18,7 @@ const Header = ({ waStatus }: HeaderProps) => {
             alt="Quadra Poker Club"
             className="h-10 w-auto object-contain"
           />
-          <div className="flex flex-col">
-            <span className="text-lg font-semibold text-emerald-300">Quadra Poker Club</span>
-            <span className="text-xs text-slate-400">Selecione o modo de uso</span>
-          </div>
+
         </div>
 
         <div className="flex items-center gap-3">
