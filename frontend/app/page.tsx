@@ -1100,7 +1100,7 @@ export default function Home() {
           </div>
 
           <div className="p-5">
-            <div className="flex gap-6 items-start">
+            <div className="flex flex-col md:flex-row gap-6 items-start">
               {/* ─── Left: editor (takes more space) ─────────────────────────── */}
               <div className="flex-1 min-w-0 space-y-4">
                 {/* Cabeçalho */}
@@ -1109,7 +1109,8 @@ export default function Home() {
                   <textarea
                     value={headerTemplate}
                     onChange={(e) => setHeaderTemplate(e.target.value)}
-                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-20 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                    rows={9}
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-36 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
                   />
                   <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code></p>
                 </div>
@@ -1174,7 +1175,7 @@ export default function Home() {
               </div>
 
               {/* ─── Right: phone-like preview ────────────────────────────────── */}
-              <div className="w-64 shrink-0 flex flex-col gap-2 self-stretch">
+              <div className="w-full md:w-72 lg:w-80 shrink-0 flex flex-col gap-2 self-stretch">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide text-center">
                   Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
                 </p>
@@ -1184,14 +1185,23 @@ export default function Home() {
                   style={{ minHeight: '560px' }}
                 >
                   {/* Phone screen (white inner area) */}
-                  <div className="rounded-2xl bg-white overflow-y-auto h-full p-4 text-sm space-y-1" style={{ minHeight: '500px' }}>
-                  {/* Header */}
-                  <div
-                    className="text-gray-900 mb-2 text-xs leading-snug"
-                    dangerouslySetInnerHTML={{
-                      __html: whatsAppToHtml(headerTemplate.replace(/<nome>/g, exampleContact.name)),
-                    }}
-                  />
+                  <div className="rounded-2xl bg-white flex flex-col h-full p-4 text-sm" style={{ minHeight: '500px' }}>
+                  {/* Bolinha preta central no topo */}
+                  <div className="flex justify-center">
+                    <span className="w-3 h-3 bg-black rounded-full mb-3" />
+                  </div>
+
+                  {/* Conteúdo rolável */}
+                  <div className="overflow-y-auto space-y-2 flex-1">
+                  {/* Header: dentro de um retângulo cinza claro com cantos arredondados */}
+                  <div className="bg-slate-100 text-gray-900 rounded-lg px-3 py-2 mb-2">
+                    <div
+                      className="text-xs leading-snug"
+                      dangerouslySetInnerHTML={{
+                        __html: whatsAppToHtml(headerTemplate.replace(/<nome>/g, exampleContact.name)),
+                      }}
+                    />
+                  </div>
 
                   {/* Cash Game segment */}
                   <div
@@ -1264,6 +1274,17 @@ export default function Home() {
                       ),
                     }}
                   />
+                  </div>
+
+                  {/* Rodapé simulado: caixa de digitação + botão verde */}
+                  <div className="mt-3 pt-3 border-t flex items-center gap-2">
+                    <div className="flex-1 h-10 bg-slate-100 rounded-full px-4 flex items-center text-xs text-slate-500">
+                      Digite uma mensagem...
+                    </div>
+                    <button className="h-10 w-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-sm shrink-0">
+                      🎤
+                    </button>
+                  </div>
                   </div>
                 </div>
               </div>
