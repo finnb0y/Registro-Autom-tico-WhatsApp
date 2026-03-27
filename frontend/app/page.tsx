@@ -1109,8 +1109,7 @@ export default function Home() {
                   <textarea
                     value={headerTemplate}
                     onChange={(e) => setHeaderTemplate(e.target.value)}
-                    rows={9}
-                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-36 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-[67px] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
                   />
                   <p className="text-xs text-slate-400">Variável: <code className="bg-emerald-900/30 rounded px-1">&lt;nome&gt;</code></p>
                 </div>
@@ -1168,14 +1167,14 @@ export default function Home() {
                   <textarea
                     value={footerTemplate}
                     onChange={(e) => setFooterTemplate(e.target.value)}
-                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-40 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
+                    className="font-mono text-sm border border-emerald-900/30 rounded-lg p-3 resize-y h-[295px] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 bg-emerald-950/20 text-slate-100"
                   />
                   <p className="text-xs text-slate-400">Variáveis: <code className="bg-emerald-900/30 rounded px-1">&lt;saldoDia&gt;</code> <code className="bg-emerald-900/30 rounded px-1">&lt;saldoTotal&gt;</code></p>
                 </div>
               </div>
 
               {/* ─── Right: phone-like preview ────────────────────────────────── */}
-              <div className="w-full md:w-72 lg:w-80 shrink-0 flex flex-col gap-2 self-stretch">
+              <div className="w-full md:w-64 lg:w-72 shrink-0 flex flex-col gap-2 self-stretch">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide text-center">
                   Pré-visualização {previewContact ? `(${previewContact.name})` : '(exemplo)'}
                 </p>
@@ -1281,8 +1280,13 @@ export default function Home() {
                     <div className="flex-1 h-10 bg-slate-100 rounded-full px-4 flex items-center text-xs text-slate-500">
                       Digite uma mensagem...
                     </div>
-                    <button className="h-10 w-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center text-sm shrink-0">
-                      🎤
+                    <button
+                      className="h-10 w-10 bg-emerald-600 hover:bg-emerald-700 rounded-full flex items-center justify-center shrink-0"
+                      aria-label="Gravar áudio"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-5 h-5" aria-hidden="true">
+                        <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm6.364 9.364a1 1 0 0 1 1 1A7.364 7.364 0 0 1 13 18.899V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.101A7.364 7.364 0 0 1 4.636 11.364a1 1 0 0 1 2 0A5.364 5.364 0 0 0 12 16.727a5.364 5.364 0 0 0 5.364-5.363 1 1 0 0 1 1-1z"/>
+                      </svg>
                     </button>
                   </div>
                   </div>
