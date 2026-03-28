@@ -196,7 +196,7 @@ function UploadZone({
     <div className="flex flex-col gap-1">
       <div
         className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
-          ${loaded ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
+          ${loaded ? 'border-green-400 bg-emerald-950/20 ring-1 ring-green-500' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
@@ -251,7 +251,7 @@ function MultiUploadZone({
     <div className="flex flex-col gap-2">
       <div
         className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
-          ${files.length > 0 ? 'border-green-400 bg-green-50' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
+          ${files.length > 0 ? 'border-green-400 bg-emerald-950/20 ring-1 ring-green-500' : dragging ? 'border-blue-400 bg-blue-50' : 'border-emerald-900/30 hover:border-emerald-700/50 bg-emerald-950/20'}`}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
