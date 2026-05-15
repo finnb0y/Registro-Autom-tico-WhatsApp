@@ -1100,9 +1100,9 @@ export default function Home() {
           </div>
 
           <div className="p-5">
-            <div className="flex flex-col md:flex-row gap-6 items-start">
+            <div className="flex flex-col md:flex-row gap-6 items-stretch md:items-start">
               {/* ─── Left: editor (takes more space) ─────────────────────────── */}
-              <div className="flex-1 min-w-0 space-y-4">
+              <div className="w-full flex-1 min-w-0 space-y-4">
                 {/* Cabeçalho */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cabeçalho</label>
