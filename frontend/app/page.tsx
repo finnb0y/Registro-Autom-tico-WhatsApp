@@ -47,6 +47,11 @@ type ParsedSheetResult = {
   error?: string;
 };
 
+type RowWithConfig = {
+  row: RawRow;
+  config?: SheetConfig;
+};
+
 // ─── Column aliases ───────────────────────────────────────────────────────────
 
 const NAME_ALIASES = [
@@ -613,15 +618,15 @@ export default function Home() {
     console.log(`[Merge] 📋 phoneMap gerado com ${phoneMap.size} entrada(s).`);
 
     // Mapas de gastos: nome normalizado → linha da planilha
-    const cashMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
-    const torneioMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
-    const barMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
+    const cashMap = new Map<string, RowWithConfig>();
+    const torneioMap = new Map<string, RowWithConfig>();
+    const barMap = new Map<string, RowWithConfig>();
 
     // Conjunto ordenado de nomes (mantém ordem de aparição)
     const namesInOrder: { key: string; originalName: string }[] = [];
     const seenNames = new Set<string>();
 
-    function indexRows(rows: RawRow[], map: Map<string, { row: RawRow; config?: SheetConfig }>, config?: SheetConfig) {
+    function indexRows(rows: RawRow[], map: Map<string, RowWithConfig>, config?: SheetConfig) {
       rows.forEach((r) => {
         const name = String(findMappedCol(r, NAME_ALIASES, 'name', config) ?? '').trim();
         if (!name) return;
@@ -1100,14 +1105,16 @@ export default function Home() {
     : 0;
   const massaSuccessCount = massaResults.filter((r) => r.success).length;
   const massaErrorCount   = massaResults.filter((r) => !r.success).length;
-  const requiredFieldsForManualTarget: SheetRequirement[] =
-    manualConfigTarget?.type === 'cadastros' || manualConfigTarget?.type === 'massa-cadastros'
-      ? CADASTROS_FIELDS
-      : manualConfigTarget?.type === 'cash'
-        ? CASH_FIELDS
-        : manualConfigTarget?.type === 'torneio'
-          ? TORNEIO_FIELDS
-          : BAR_FIELDS;
+  const requiredFieldsByTargetType: Record<ManualConfigTarget['type'], SheetRequirement[]> = {
+    cadastros: CADASTROS_FIELDS,
+    'massa-cadastros': CADASTROS_FIELDS,
+    cash: CASH_FIELDS,
+    torneio: TORNEIO_FIELDS,
+    bar: BAR_FIELDS,
+  };
+  const requiredFieldsForManualTarget: SheetRequirement[] = manualConfigTarget
+    ? requiredFieldsByTargetType[manualConfigTarget.type]
+    : BAR_FIELDS;
 
   // ─── QR Code block (shared) ───────────────────────────────────────────────────
 
