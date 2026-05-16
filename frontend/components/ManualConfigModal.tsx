@@ -22,7 +22,50 @@ type ManualConfigModalProps = {
 };
 
 const PREVIEW_ROWS = 10;
-const PREVIEW_COLS = 8;
+const FIELD_COLORS = [
+  {
+    dot: 'bg-sky-400',
+    button: 'border-sky-500/40 bg-sky-500/10 text-sky-100 hover:bg-sky-500/20',
+    buttonActive: 'ring-2 ring-sky-300 border-sky-400/70 bg-sky-500/20',
+    column: 'bg-sky-500/18',
+    columnHover: 'hover:bg-sky-500/12',
+  },
+  {
+    dot: 'bg-violet-400',
+    button: 'border-violet-500/40 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20',
+    buttonActive: 'ring-2 ring-violet-300 border-violet-400/70 bg-violet-500/20',
+    column: 'bg-violet-500/18',
+    columnHover: 'hover:bg-violet-500/12',
+  },
+  {
+    dot: 'bg-amber-400',
+    button: 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20',
+    buttonActive: 'ring-2 ring-amber-300 border-amber-400/70 bg-amber-500/20',
+    column: 'bg-amber-500/18',
+    columnHover: 'hover:bg-amber-500/12',
+  },
+  {
+    dot: 'bg-emerald-400',
+    button: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20',
+    buttonActive: 'ring-2 ring-emerald-300 border-emerald-400/70 bg-emerald-500/20',
+    column: 'bg-emerald-500/18',
+    columnHover: 'hover:bg-emerald-500/12',
+  },
+  {
+    dot: 'bg-rose-400',
+    button: 'border-rose-500/40 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20',
+    buttonActive: 'ring-2 ring-rose-300 border-rose-400/70 bg-rose-500/20',
+    column: 'bg-rose-500/18',
+    columnHover: 'hover:bg-rose-500/12',
+  },
+  {
+    dot: 'bg-cyan-400',
+    button: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20',
+    buttonActive: 'ring-2 ring-cyan-300 border-cyan-400/70 bg-cyan-500/20',
+    column: 'bg-cyan-500/18',
+    columnHover: 'hover:bg-cyan-500/12',
+  },
+];
 
 function normalizeHeader(value: unknown): string {
   return String(value ?? '')
@@ -46,17 +89,19 @@ export default function ManualConfigModal({
 }: ManualConfigModalProps) {
   const [headerRowIndex, setHeaderRowIndex] = useState(0);
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
+  const [activeFieldKey, setActiveFieldKey] = useState<string | null>(requiredFields[0]?.key ?? null);
 
   useEffect(() => {
     setHeaderRowIndex(0);
     setColumnMap({});
-  }, [fileName]);
+    setActiveFieldKey(requiredFields[0]?.key ?? null);
+  }, [fileName, requiredFields]);
 
   const previewRows = useMemo(() => rawRows.slice(0, PREVIEW_ROWS), [rawRows]);
 
   const previewColumnCount = useMemo(() => {
     const max = previewRows.reduce((acc, row) => Math.max(acc, row.length), 0);
-    return Math.max(1, Math.min(PREVIEW_COLS, max));
+    return Math.max(1, max);
   }, [previewRows]);
 
   const headerValues = useMemo(() => rawRows[headerRowIndex] ?? [], [rawRows, headerRowIndex]);
@@ -91,6 +136,60 @@ export default function ManualConfigModal({
       return next;
     });
   }, [columnOptions, requiredFields]);
+
+  useEffect(() => {
+    if (requiredFields.length === 0) {
+      setActiveFieldKey(null);
+      return;
+    }
+
+    if (!activeFieldKey || !requiredFields.some((field) => field.key === activeFieldKey)) {
+      setActiveFieldKey(requiredFields[0].key);
+    }
+  }, [activeFieldKey, requiredFields]);
+
+  const fieldStyles = useMemo(
+    () =>
+      Object.fromEntries(
+        requiredFields.map((field, index) => [field.key, FIELD_COLORS[index % FIELD_COLORS.length]]),
+      ),
+    [requiredFields],
+  );
+
+  const fieldByColumn = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(columnMap)
+          .filter(([, value]) => Boolean(value))
+          .map(([fieldKey, value]) => [value, fieldKey]),
+      ),
+    [columnMap],
+  );
+
+  function handleColumnSelection(columnIndex: number) {
+    if (!activeFieldKey) return;
+    const selectedColumn = columnOptions[columnIndex];
+    if (!selectedColumn) return;
+
+    const nextMap = requiredFields.reduce<Record<string, string>>((acc, field) => {
+      const previousValue = columnMap[field.key] ?? '';
+      if (field.key === activeFieldKey) {
+        acc[field.key] = selectedColumn.value;
+        return acc;
+      }
+      acc[field.key] = previousValue === selectedColumn.value ? '' : previousValue;
+      return acc;
+    }, {});
+
+    setColumnMap(nextMap);
+    const nextField = requiredFields.find((field) => !nextMap[field.key])?.key ?? activeFieldKey;
+    setActiveFieldKey(nextField);
+  }
+
+  function clearFieldSelection(fieldKey: string) {
+    setColumnMap((prev) => ({ ...prev, [fieldKey]: '' }));
+    setActiveFieldKey(fieldKey);
+  }
 
   const canConfirm = requiredFields.every((field) => Boolean(columnMap[field.key]));
 
@@ -140,24 +239,102 @@ export default function ManualConfigModal({
 
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-slate-100">2. Mapeamento de colunas</h4>
+            <p className="text-xs text-slate-400">
+              Escolha um campo abaixo e depois clique em qualquer célula da coluna correspondente na pré-visualização.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {requiredFields.map((field) => (
-                <label key={field.key} className="flex flex-col gap-1">
-                  <span className="text-xs text-slate-300 font-medium">{field.label}</span>
-                  <select
-                    value={columnMap[field.key] ?? ''}
-                    onChange={(e) => setColumnMap((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="bg-emerald-950/30 border border-emerald-900/40 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              {requiredFields.map((field) => {
+                const styles = fieldStyles[field.key];
+                const isActive = activeFieldKey === field.key;
+                const selectedValue = columnMap[field.key];
+
+                return (
+                  <div
+                    key={field.key}
+                    className={`rounded-xl border px-3 py-3 transition-all ${
+                      isActive ? `${styles.button} ${styles.buttonActive}` : styles.button
+                    }`}
                   >
-                    <option value="">Selecione a coluna</option>
-                    {columnOptions.map((option, index) => (
-                      <option key={`${index}-${option.value}`} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => setActiveFieldKey(field.key)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${styles.dot}`} />
+                        <span className="text-sm font-semibold">{field.label}</span>
+                      </div>
+                      <p className="text-xs mt-2 opacity-90">
+                        {selectedValue ? `Coluna selecionada: ${selectedValue}` : 'Clique para escolher a coluna'}
+                      </p>
+                    </button>
+                    {selectedValue && (
+                      <button
+                        type="button"
+                        onClick={() => clearFieldSelection(field.key)}
+                        className="mt-3 text-xs text-slate-200/80 hover:text-slate-100 underline underline-offset-2"
+                      >
+                        Limpar seleção
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="overflow-x-auto border border-emerald-900/40 rounded-lg">
+              <table className="w-full text-xs">
+                <thead className="bg-emerald-900/30 text-slate-300">
+                  <tr>
+                    {Array.from({ length: previewColumnCount }).map((_, colIndex) => {
+                      const option = columnOptions[colIndex];
+                      const fieldKey = option ? fieldByColumn[option.value] : undefined;
+                      const styles = fieldKey ? fieldStyles[fieldKey] : undefined;
+
+                      return (
+                        <th
+                          key={colIndex}
+                          onClick={() => handleColumnSelection(colIndex)}
+                          className={`px-2 py-2 text-left min-w-[140px] border-l border-emerald-900/20 first:border-l-0 cursor-pointer transition-colors ${
+                            styles ? styles.column : activeFieldKey ? 'hover:bg-emerald-900/30' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>Coluna {colIndex + 1}</span>
+                            {fieldKey && <span className={`h-2 w-2 rounded-full ${styles?.dot}`} />}
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-400 font-normal truncate">
+                            {option?.value || `Coluna ${colIndex + 1}`}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-t border-emerald-900/20">
+                      {Array.from({ length: previewColumnCount }).map((__, colIndex) => {
+                        const option = columnOptions[colIndex];
+                        const fieldKey = option ? fieldByColumn[option.value] : undefined;
+                        const styles = fieldKey ? fieldStyles[fieldKey] : undefined;
+
+                        return (
+                          <td
+                            key={colIndex}
+                            onClick={() => handleColumnSelection(colIndex)}
+                            className={`px-2 py-2 text-slate-200 max-w-[200px] truncate cursor-pointer transition-colors border-l border-emerald-900/20 first:border-l-0 ${
+                              styles ? styles.column : activeFieldKey ? 'hover:bg-emerald-900/20' : ''
+                            }`}
+                          >
+                            {cellToText(row[colIndex]) || '—'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         </div>
