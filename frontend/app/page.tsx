@@ -93,9 +93,10 @@ function normalizeColName(col: string): string {
 }
 
 function findCol(row: RawRow, aliases: string[]): string | number | undefined {
+  const normalizedAliases = aliases.map((alias) => normalizeColName(alias));
   for (const [k, v] of Object.entries(row)) {
     const normalizedKey = normalizeColName(k);
-    if (aliases.some((alias) => normalizeColName(alias) === normalizedKey)) return v as string | number;
+    if (normalizedAliases.includes(normalizedKey)) return v as string | number;
   }
   return undefined;
 }
@@ -103,10 +104,10 @@ function findCol(row: RawRow, aliases: string[]): string | number | undefined {
 function findMappedCol(
   row: RawRow,
   aliases: string[],
-  fieldKey: string,
+  fieldKey?: string,
   config?: SheetConfig,
 ): string | number | undefined {
-  const mappedColumn = config?.columnMap[fieldKey];
+  const mappedColumn = fieldKey ? config?.columnMap[fieldKey] : undefined;
   if (mappedColumn !== undefined) {
     return row[mappedColumn] as string | number | undefined;
   }
@@ -166,7 +167,7 @@ function findMissingFields(rows: RawRow[], requiredFields: SheetRequirement[], c
 
 function parseRowsWithAutoHeader(rawRows: WorksheetRows, requiredFields: SheetRequirement[], skipFirstRow: boolean): ParsedSheetResult {
   const firstHeader = skipFirstRow ? 1 : 0;
-  const candidateIndexes = [firstHeader, firstHeader + 1].filter((idx, pos, arr) => idx < rawRows.length && arr.indexOf(idx) === pos);
+  const candidateIndexes = [firstHeader, firstHeader + 1].filter((idx) => idx < rawRows.length);
   if (candidateIndexes.length === 0) {
     return { rows: [], rawRows, needsManualConfig: true, missingLabels: requiredFields.map((f) => f.label), error: 'Planilha vazia.' };
   }
@@ -659,9 +660,9 @@ export default function Home() {
       // saldoTotal: prefer Cash Game > Torneio > Bar, as specified in the business rules
       // (all three sheets should carry the same value; we just take the first available)
       const saldoTotal = normalizeValue(
-        ((cashEntry && findMappedCol(cashEntry.row, TOTAL_ALIASES, 'total', cashEntry.config)) ||
-         (torneioEntry && findMappedCol(torneioEntry.row, TOTAL_ALIASES, 'total', torneioEntry.config)) ||
-         (barEntry && findMappedCol(barEntry.row, TOTAL_ALIASES, 'total', barEntry.config)) ||
+        ((cashEntry && findMappedCol(cashEntry.row, TOTAL_ALIASES, undefined, cashEntry.config)) ||
+         (torneioEntry && findMappedCol(torneioEntry.row, TOTAL_ALIASES, undefined, torneioEntry.config)) ||
+         (barEntry && findMappedCol(barEntry.row, TOTAL_ALIASES, undefined, barEntry.config)) ||
          undefined) as string | number | undefined,
       );
 

@@ -150,8 +150,8 @@ export default function ManualConfigModal({
                     className="bg-emerald-950/30 border border-emerald-900/40 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   >
                     <option value="">Selecione a coluna</option>
-                    {columnOptions.map((option) => (
-                      <option key={option.label} value={option.value}>
+                    {columnOptions.map((option, index) => (
+                      <option key={`${index}-${option.value}`} value={option.value}>
                         {option.label}
                       </option>
                     ))}
