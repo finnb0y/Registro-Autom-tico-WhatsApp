@@ -6,6 +6,7 @@ import { BarChart3, Send } from 'lucide-react';
 import Header from '@/components/Header';
 import WhatsAppConnect from '@/components/WhatsAppConnect';
 import FeatureCard from '@/components/FeatureCard';
+import ManualConfigModal, { type ManualFieldRequirement, type SheetConfig } from '@/components/ManualConfigModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,10 +35,21 @@ type WhatsAppStatus = {
 };
 
 type RawRow = Record<string, unknown>;
+type WorksheetRows = unknown[][];
+
+type SheetRequirement = ManualFieldRequirement;
+
+type ParsedSheetResult = {
+  rows: RawRow[];
+  rawRows: WorksheetRows;
+  needsManualConfig: boolean;
+  missingLabels: string[];
+  error?: string;
+};
 
 // ─── Column aliases ───────────────────────────────────────────────────────────
 
-const NAME_ALIASES     = [
+const NAME_ALIASES = [
   'nome',
   'name',
   'cliente',
@@ -48,18 +60,145 @@ const NAME_ALIASES     = [
   'jogador',
   'player',
 ];
-const PHONE_ALIASES    = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
-const CASH_ALIASES     = ['saldo/cashgame', 'saldo cashgame', 'saldo/cash game', 'saldo cash game', 'gasto cash game no dia', 'gasto cash game', 'gastocashgame', 'cash game', 'consumo cash'];
-const TORNEIO_ALIASES  = ['saldo/torneio', 'saldo torneio', 'torneio', 'saldotorneio'];
-const BAR_ALIASES      = ['saldo/comanda', 'saldo comanda', 'saldo/bar', 'saldo bar', 'bar', 'consumo bar', 'saldo final no dia'];
-const TOTAL_ALIASES    = ['saldo/final', 'saldo final', 'saldo total', 'saldo', 'balance'];
+const PHONE_ALIASES = ['telefone', 'fone', 'celular', 'phone', 'numero', 'número', 'whatsapp'];
+const CASH_ALIASES = ['saldo/cashgame', 'saldo cashgame', 'saldo/cash game', 'saldo cash game', 'gasto cash game no dia', 'gasto cash game', 'gastocashgame', 'cash game', 'consumo cash'];
+const TORNEIO_ALIASES = ['saldo/torneio', 'saldo torneio', 'torneio', 'saldotorneio'];
+const BAR_ALIASES = ['saldo/comanda', 'saldo comanda', 'saldo/bar', 'saldo bar', 'bar', 'consumo bar', 'saldo final no dia'];
+const TOTAL_ALIASES = ['saldo/final', 'saldo final', 'saldo total', 'saldo', 'balance'];
+
+const CADASTROS_FIELDS: SheetRequirement[] = [
+  { key: 'name', label: 'Nome', aliases: NAME_ALIASES },
+  { key: 'phone', label: 'Telefone', aliases: PHONE_ALIASES },
+];
+const CASH_FIELDS: SheetRequirement[] = [
+  { key: 'name', label: 'Nome', aliases: NAME_ALIASES },
+  { key: 'cash', label: 'Cash Game', aliases: CASH_ALIASES },
+];
+const TORNEIO_FIELDS: SheetRequirement[] = [
+  { key: 'name', label: 'Nome', aliases: NAME_ALIASES },
+  { key: 'torneio', label: 'Torneio', aliases: TORNEIO_ALIASES },
+];
+const BAR_FIELDS: SheetRequirement[] = [
+  { key: 'name', label: 'Nome', aliases: NAME_ALIASES },
+  { key: 'bar', label: 'Bar', aliases: BAR_ALIASES },
+];
+
+function normalizeColName(col: string): string {
+  return col
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
 
 function findCol(row: RawRow, aliases: string[]): string | number | undefined {
   for (const [k, v] of Object.entries(row)) {
-    const normalizedKey = k.trim().toLowerCase().replace(/\s+/g, ' ');
-    if (aliases.includes(normalizedKey)) return v as string | number;
+    const normalizedKey = normalizeColName(k);
+    if (aliases.some((alias) => normalizeColName(alias) === normalizedKey)) return v as string | number;
   }
   return undefined;
+}
+
+function findMappedCol(
+  row: RawRow,
+  aliases: string[],
+  fieldKey: string,
+  config?: SheetConfig,
+): string | number | undefined {
+  const mappedColumn = config?.columnMap[fieldKey];
+  if (mappedColumn !== undefined) {
+    return row[mappedColumn] as string | number | undefined;
+  }
+  return findCol(row, aliases);
+}
+
+function readFileAsWorksheetRows(file: File): Promise<WorksheetRows> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+        resolve(rawRows);
+      } catch {
+        reject(new Error('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function toRawRowsWithHeader(rawRows: WorksheetRows, headerRowIndex: number): RawRow[] {
+  const headerRow = rawRows[headerRowIndex] ?? [];
+  const headers = headerRow.map((cell, i) => {
+    const value = String(cell ?? '').trim();
+    return value || `Coluna ${i + 1}`;
+  });
+  const rows = rawRows.slice(headerRowIndex + 1);
+
+  return rows
+    .map((row) => {
+      const out: RawRow = {};
+      headers.forEach((header, i) => {
+        out[header] = row?.[i] ?? '';
+      });
+      return out;
+    })
+    .filter((row) => Object.values(row).some((v) => String(v ?? '').trim() !== ''));
+}
+
+function findMissingFields(rows: RawRow[], requiredFields: SheetRequirement[], config?: SheetConfig): string[] {
+  if (rows.length === 0) {
+    return requiredFields.map((f) => f.label);
+  }
+  const sampleRow = rows[0];
+  return requiredFields
+    .filter((field) => {
+      const value = findMappedCol(sampleRow, field.aliases, field.key, config);
+      return value === undefined;
+    })
+    .map((field) => field.label);
+}
+
+function parseRowsWithAutoHeader(rawRows: WorksheetRows, requiredFields: SheetRequirement[], skipFirstRow: boolean): ParsedSheetResult {
+  const firstHeader = skipFirstRow ? 1 : 0;
+  const candidateIndexes = [firstHeader, firstHeader + 1].filter((idx, pos, arr) => idx < rawRows.length && arr.indexOf(idx) === pos);
+  if (candidateIndexes.length === 0) {
+    return { rows: [], rawRows, needsManualConfig: true, missingLabels: requiredFields.map((f) => f.label), error: 'Planilha vazia.' };
+  }
+
+  let bestRows: RawRow[] = [];
+  let bestMissing = requiredFields.map((f) => f.label);
+
+  for (const idx of candidateIndexes) {
+    const rows = toRawRowsWithHeader(rawRows, idx);
+    const missing = findMissingFields(rows, requiredFields);
+    if (missing.length < bestMissing.length) {
+      bestRows = rows;
+      bestMissing = missing;
+    }
+    if (missing.length === 0) {
+      return { rows, rawRows, needsManualConfig: false, missingLabels: [] };
+    }
+  }
+
+  return { rows: bestRows, rawRows, needsManualConfig: true, missingLabels: bestMissing };
+}
+
+function parseRowsWithConfig(rawRows: WorksheetRows, requiredFields: SheetRequirement[], config: SheetConfig): ParsedSheetResult {
+  const rows = toRawRowsWithHeader(rawRows, config.headerRowIndex);
+  const missingLabels = findMissingFields(rows, requiredFields, config);
+  return {
+    rows,
+    rawRows,
+    needsManualConfig: missingLabels.length > 0,
+    missingLabels,
+    error: rows.length === 0 ? 'Planilha vazia.' : undefined,
+  };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -229,7 +368,22 @@ function UploadZone({
 
 // ─── MultiUploadZone sub-component ───────────────────────────────────────────
 
-type MultiFile = { name: string; data: RawRow[]; error?: string };
+type MultiFile = {
+  name: string;
+  data: RawRow[];
+  error?: string;
+  rawRows?: WorksheetRows;
+  needsManualConfig?: boolean;
+  missingLabels?: string[];
+  config?: SheetConfig;
+};
+
+type ManualConfigTarget =
+  | { type: 'cadastros'; fileName: string; rawRows: WorksheetRows }
+  | { type: 'massa-cadastros'; fileName: string; rawRows: WorksheetRows }
+  | { type: 'cash'; index: number; fileName: string; rawRows: WorksheetRows }
+  | { type: 'torneio'; index: number; fileName: string; rawRows: WorksheetRows }
+  | { type: 'bar'; index: number; fileName: string; rawRows: WorksheetRows };
 
 function MultiUploadZone({
   label,
@@ -237,12 +391,14 @@ function MultiUploadZone({
   files,
   onAdd,
   onRemove,
+  onManualConfig,
 }: {
   label: string;
   icon: string;
   files: MultiFile[];
   onAdd: (file: File) => void;
   onRemove: (index: number) => void;
+  onManualConfig: (index: number) => void;
 }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -294,6 +450,23 @@ function MultiUploadZone({
                 </button>
               </div>
               {f.error && <p className="text-xs text-red-600 px-1">⚠️ {f.error}</p>}
+              {f.needsManualConfig && (
+                <div className="px-1 py-1">
+                  <p className="text-xs text-amber-500">
+                    ⚠️ Campos não encontrados: {(f.missingLabels ?? []).join(', ')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onManualConfig(i);
+                    }}
+                    className="mt-1 text-xs px-2 py-1 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                  >
+                    Seleção Manual
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -317,6 +490,10 @@ export default function Home() {
   const [cadastrosData, setCadastrosData] = useState<RawRow[] | null>(null);
   const [cadastrosFile, setCadastrosFile] = useState<string | null>(null);
   const [cadastrosError, setCadastrosError] = useState<string | null>(null);
+  const [cadastrosRawRows, setCadastrosRawRows] = useState<WorksheetRows | null>(null);
+  const [cadastrosNeedsManualConfig, setCadastrosNeedsManualConfig] = useState(false);
+  const [cadastrosMissingLabels, setCadastrosMissingLabels] = useState<string[]>([]);
+  const [cadastrosConfig, setCadastrosConfig] = useState<SheetConfig | undefined>(undefined);
 
   // Multi-file states for Resumos mode categories
   const [cashGameFiles, setCashGameFiles]   = useState<MultiFile[]>([]);
@@ -327,6 +504,10 @@ export default function Home() {
   const [massaCadastrosData, setMassaCadastrosData] = useState<RawRow[] | null>(null);
   const [massaCadastrosFile, setMassaCadastrosFile] = useState<string | null>(null);
   const [massaCadastrosError, setMassaCadastrosError] = useState<string | null>(null);
+  const [massaCadastrosRawRows, setMassaCadastrosRawRows] = useState<WorksheetRows | null>(null);
+  const [massaCadastrosNeedsManualConfig, setMassaCadastrosNeedsManualConfig] = useState(false);
+  const [massaCadastrosMissingLabels, setMassaCadastrosMissingLabels] = useState<string[]>([]);
+  const [massaCadastrosConfig, setMassaCadastrosConfig] = useState<SheetConfig | undefined>(undefined);
   const [massaMessage, setMassaMessage] = useState('');
   const [massaImage, setMassaImage] = useState<File | null>(null);
   const [massaImagePreview, setMassaImagePreview] = useState<string | null>(null);
@@ -344,6 +525,7 @@ export default function Home() {
   const [waStatus, setWaStatus] = useState<WhatsAppStatus>({ connected: false, hasQr: false, phone: null });
   const [qrImage, setQrImage]   = useState<string | null>(null);
   const [mergeWarnings, setMergeWarnings] = useState<string[]>([]);
+  const [manualConfigTarget, setManualConfigTarget] = useState<ManualConfigTarget | null>(null);
 
   // ─── WhatsApp polling ────────────────────────────────────────────────────────
 
@@ -423,27 +605,27 @@ export default function Home() {
     // Mapa de cadastro: nome normalizado → telefone
     const phoneMap = new Map<string, string>();
     cadastrosData.forEach((r) => {
-      const name  = String(findCol(r, NAME_ALIASES)  ?? '').trim();
-      const phone = String(findCol(r, PHONE_ALIASES) ?? '').trim();
+      const name = String(findMappedCol(r, NAME_ALIASES, 'name', cadastrosConfig) ?? '').trim();
+      const phone = String(findMappedCol(r, PHONE_ALIASES, 'phone', cadastrosConfig) ?? '').trim();
       if (name && phone) phoneMap.set(normalizeName(name), phone);
     });
     console.log(`[Merge] 📋 phoneMap gerado com ${phoneMap.size} entrada(s).`);
 
     // Mapas de gastos: nome normalizado → linha da planilha
-    const cashMap    = new Map<string, RawRow>();
-    const torneioMap = new Map<string, RawRow>();
-    const barMap     = new Map<string, RawRow>();
+    const cashMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
+    const torneioMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
+    const barMap = new Map<string, { row: RawRow; config?: SheetConfig }>();
 
     // Conjunto ordenado de nomes (mantém ordem de aparição)
     const namesInOrder: { key: string; originalName: string }[] = [];
     const seenNames = new Set<string>();
 
-    function indexRows(rows: RawRow[], map: Map<string, RawRow>) {
+    function indexRows(rows: RawRow[], map: Map<string, { row: RawRow; config?: SheetConfig }>, config?: SheetConfig) {
       rows.forEach((r) => {
-        const name = String(findCol(r, NAME_ALIASES) ?? '').trim();
+        const name = String(findMappedCol(r, NAME_ALIASES, 'name', config) ?? '').trim();
         if (!name) return;
         const key = normalizeName(stripIdSuffix(name));
-        map.set(key, r);
+        map.set(key, { row: r, config });
         if (!seenNames.has(key)) {
           seenNames.add(key);
           namesInOrder.push({ key, originalName: name });
@@ -451,14 +633,9 @@ export default function Home() {
       });
     }
 
-    // Concatenar todas as linhas de cada categoria
-    const allCashRows    = cashGameFiles.flatMap((f) => f.data);
-    const allTorneioRows = torneioFiles.flatMap((f) => f.data);
-    const allBarRows     = barFiles.flatMap((f) => f.data);
-
-    indexRows(allCashRows,    cashMap);
-    indexRows(allTorneioRows, torneioMap);
-    indexRows(allBarRows,     barMap);
+    cashGameFiles.forEach((file) => indexRows(file.data, cashMap, file.config));
+    torneioFiles.forEach((file) => indexRows(file.data, torneioMap, file.config));
+    barFiles.forEach((file) => indexRows(file.data, barMap, file.config));
 
     const merged: Contact[] = [];
     const warnings: string[] = [];
@@ -471,20 +648,20 @@ export default function Home() {
         return; // sem telefone cadastrado, ignora
       }
 
-      const cashRow    = cashMap.get(key);
-      const torneioRow = torneioMap.get(key);
-      const barRow     = barMap.get(key);
+      const cashEntry = cashMap.get(key);
+      const torneioEntry = torneioMap.get(key);
+      const barEntry = barMap.get(key);
 
-      const gastoCashGame = normalizeValue(cashRow    ? findCol(cashRow,    CASH_ALIASES)    as string | number | undefined : undefined);
-      const saldoTorneio  = normalizeValue(torneioRow ? findCol(torneioRow, TORNEIO_ALIASES) as string | number | undefined : undefined);
-      const saldoBar      = normalizeValue(barRow     ? findCol(barRow,     BAR_ALIASES)     as string | number | undefined : undefined);
+      const gastoCashGame = normalizeValue(cashEntry ? findMappedCol(cashEntry.row, CASH_ALIASES, 'cash', cashEntry.config) as string | number | undefined : undefined);
+      const saldoTorneio = normalizeValue(torneioEntry ? findMappedCol(torneioEntry.row, TORNEIO_ALIASES, 'torneio', torneioEntry.config) as string | number | undefined : undefined);
+      const saldoBar = normalizeValue(barEntry ? findMappedCol(barEntry.row, BAR_ALIASES, 'bar', barEntry.config) as string | number | undefined : undefined);
 
       // saldoTotal: prefer Cash Game > Torneio > Bar, as specified in the business rules
       // (all three sheets should carry the same value; we just take the first available)
       const saldoTotal = normalizeValue(
-        ((cashRow    && findCol(cashRow,    TOTAL_ALIASES)) ||
-         (torneioRow && findCol(torneioRow, TOTAL_ALIASES)) ||
-         (barRow     && findCol(barRow,     TOTAL_ALIASES)) ||
+        ((cashEntry && findMappedCol(cashEntry.row, TOTAL_ALIASES, 'total', cashEntry.config)) ||
+         (torneioEntry && findMappedCol(torneioEntry.row, TOTAL_ALIASES, 'total', torneioEntry.config)) ||
+         (barEntry && findMappedCol(barEntry.row, TOTAL_ALIASES, 'total', barEntry.config)) ||
          undefined) as string | number | undefined,
       );
 
@@ -518,68 +695,80 @@ export default function Home() {
 
   // ─── Parse helpers ────────────────────────────────────────────────────────────
 
-  function parseSheet(
+  async function parseUploadedSheet(
     file: File,
-    onData: (rows: RawRow[]) => void,
-    onError: (msg: string) => void,
-    validate?: (rows: RawRow[]) => boolean,
+    requiredFields: SheetRequirement[],
     skipFirstRow = false,
-  ) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb   = XLSX.read(data, { type: 'array' });
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-
-        const range = skipFirstRow ? 1 : undefined;
-        const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range });
-        if (rows.length === 0) { onError('Planilha vazia.'); return; }
-
-        if (!validate || validate(rows)) {
-          onData(rows);
-          return;
-        }
-
-        const rowsSkipped = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: '', range: (range ?? 0) + 1 });
-        if (rowsSkipped.length === 0) { onError('Planilha vazia.'); return; }
-
-        if (validate(rowsSkipped)) {
-          onData(rowsSkipped);
-          return;
-        }
-
-        onError('Colunas esperadas não encontradas na planilha.');
-      } catch {
-        onError('Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    config?: SheetConfig,
+  ): Promise<ParsedSheetResult> {
+    const rawRows = await readFileAsWorksheetRows(file);
+    if (rawRows.length === 0) {
+      return { rows: [], rawRows, needsManualConfig: true, missingLabels: requiredFields.map((f) => f.label), error: 'Planilha vazia.' };
+    }
+    return config
+      ? parseRowsWithConfig(rawRows, requiredFields, config)
+      : parseRowsWithAutoHeader(rawRows, requiredFields, skipFirstRow);
   }
 
-  function handleCadastros(file: File) {
+  function missingFieldsMessage(labels: string[]): string {
+    return `Campos obrigatórios não encontrados: ${labels.join(', ')}.`;
+  }
+
+  async function handleCadastros(file: File) {
     setCadastrosError(null);
     setCadastrosFile(file.name);
+    setCadastrosConfig(undefined);
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(
-      file,
-      setCadastrosData,
-      setCadastrosError,
-      (rows) => rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)),
-    );
+    try {
+      const parsed = await parseUploadedSheet(file, CADASTROS_FIELDS);
+      setCadastrosRawRows(parsed.rawRows);
+      setCadastrosMissingLabels(parsed.missingLabels);
+      setCadastrosNeedsManualConfig(parsed.needsManualConfig);
+      if (parsed.error) {
+        setCadastrosData(null);
+        setCadastrosError(parsed.error);
+        return;
+      }
+      if (parsed.needsManualConfig) {
+        setCadastrosData(null);
+        setCadastrosError(missingFieldsMessage(parsed.missingLabels));
+        return;
+      }
+      setCadastrosData(parsed.rows);
+      setCadastrosError(null);
+    } catch (err) {
+      setCadastrosData(null);
+      setCadastrosRawRows(null);
+      setCadastrosNeedsManualConfig(false);
+      setCadastrosMissingLabels([]);
+      setCadastrosError(err instanceof Error ? err.message : 'Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
+    }
   }
 
-  function handleAddCashGame(file: File) {
+  async function handleAddCashGame(file: File) {
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(
-      file,
-      (data) => setCashGameFiles((prev) => [...prev, { name: file.name, data }]),
-      (error) => setCashGameFiles((prev) => [...prev, { name: file.name, data: [], error }]),
-      undefined,
-      true,
-    );
+    try {
+      const parsed = await parseUploadedSheet(file, CASH_FIELDS, true);
+      setCashGameFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          data: parsed.needsManualConfig ? [] : parsed.rows,
+          rawRows: parsed.rawRows,
+          needsManualConfig: parsed.needsManualConfig,
+          missingLabels: parsed.missingLabels,
+          error: parsed.error || (parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined),
+        },
+      ]);
+    } catch (err) {
+      setCashGameFiles((prev) => [...prev, {
+        name: file.name,
+        data: [],
+        error: err instanceof Error ? err.message : 'Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.',
+      }]);
+    }
   }
 
   function handleRemoveCashGame(index: number) {
@@ -588,16 +777,29 @@ export default function Home() {
     setMergeWarnings([]);
   }
 
-  function handleAddTorneio(file: File) {
+  async function handleAddTorneio(file: File) {
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(
-      file,
-      (data) => setTorneioFiles((prev) => [...prev, { name: file.name, data }]),
-      (error) => setTorneioFiles((prev) => [...prev, { name: file.name, data: [], error }]),
-      undefined,
-      true,
-    );
+    try {
+      const parsed = await parseUploadedSheet(file, TORNEIO_FIELDS, true);
+      setTorneioFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          data: parsed.needsManualConfig ? [] : parsed.rows,
+          rawRows: parsed.rawRows,
+          needsManualConfig: parsed.needsManualConfig,
+          missingLabels: parsed.missingLabels,
+          error: parsed.error || (parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined),
+        },
+      ]);
+    } catch (err) {
+      setTorneioFiles((prev) => [...prev, {
+        name: file.name,
+        data: [],
+        error: err instanceof Error ? err.message : 'Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.',
+      }]);
+    }
   }
 
   function handleRemoveTorneio(index: number) {
@@ -606,16 +808,29 @@ export default function Home() {
     setMergeWarnings([]);
   }
 
-  function handleAddBar(file: File) {
+  async function handleAddBar(file: File) {
     setContacts([]);
     setMergeWarnings([]);
-    parseSheet(
-      file,
-      (data) => setBarFiles((prev) => [...prev, { name: file.name, data }]),
-      (error) => setBarFiles((prev) => [...prev, { name: file.name, data: [], error }]),
-      undefined,
-      true,
-    );
+    try {
+      const parsed = await parseUploadedSheet(file, BAR_FIELDS, true);
+      setBarFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          data: parsed.needsManualConfig ? [] : parsed.rows,
+          rawRows: parsed.rawRows,
+          needsManualConfig: parsed.needsManualConfig,
+          missingLabels: parsed.missingLabels,
+          error: parsed.error || (parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined),
+        },
+      ]);
+    } catch (err) {
+      setBarFiles((prev) => [...prev, {
+        name: file.name,
+        data: [],
+        error: err instanceof Error ? err.message : 'Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.',
+      }]);
+    }
   }
 
   function handleRemoveBar(index: number) {
@@ -625,17 +840,128 @@ export default function Home() {
   }
 
   // Envio em Massa handlers
-  function handleMassaCadastros(file: File) {
+  async function handleMassaCadastros(file: File) {
     setMassaCadastrosError(null);
     setMassaCadastrosFile(file.name);
+    setMassaCadastrosConfig(undefined);
     setMassaResults([]);
     setMassaIsDone(false);
-    parseSheet(
-      file,
-      setMassaCadastrosData,
-      setMassaCadastrosError,
-      (rows) => rows.some((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)),
-    );
+    try {
+      const parsed = await parseUploadedSheet(file, CADASTROS_FIELDS);
+      setMassaCadastrosRawRows(parsed.rawRows);
+      setMassaCadastrosMissingLabels(parsed.missingLabels);
+      setMassaCadastrosNeedsManualConfig(parsed.needsManualConfig);
+      if (parsed.error) {
+        setMassaCadastrosData(null);
+        setMassaCadastrosError(parsed.error);
+        return;
+      }
+      if (parsed.needsManualConfig) {
+        setMassaCadastrosData(null);
+        setMassaCadastrosError(missingFieldsMessage(parsed.missingLabels));
+        return;
+      }
+      setMassaCadastrosData(parsed.rows);
+      setMassaCadastrosError(null);
+    } catch (err) {
+      setMassaCadastrosData(null);
+      setMassaCadastrosRawRows(null);
+      setMassaCadastrosNeedsManualConfig(false);
+      setMassaCadastrosMissingLabels([]);
+      setMassaCadastrosError(err instanceof Error ? err.message : 'Erro ao ler o arquivo. Certifique-se de que é um .xlsx válido.');
+    }
+  }
+
+  function openManualConfigForCadastros() {
+    if (!cadastrosRawRows || !cadastrosFile) return;
+    setManualConfigTarget({ type: 'cadastros', fileName: cadastrosFile, rawRows: cadastrosRawRows });
+  }
+
+  function openManualConfigForMassaCadastros() {
+    if (!massaCadastrosRawRows || !massaCadastrosFile) return;
+    setManualConfigTarget({ type: 'massa-cadastros', fileName: massaCadastrosFile, rawRows: massaCadastrosRawRows });
+  }
+
+  function handleOpenMultiFileManualConfig(type: 'cash' | 'torneio' | 'bar', index: number) {
+    const source = type === 'cash' ? cashGameFiles : type === 'torneio' ? torneioFiles : barFiles;
+    const target = source[index];
+    if (!target?.rawRows) return;
+    setManualConfigTarget({ type, index, fileName: target.name, rawRows: target.rawRows });
+  }
+
+  function applyManualConfig(config: SheetConfig) {
+    if (!manualConfigTarget) return;
+    setContacts([]);
+    setMergeWarnings([]);
+
+    if (manualConfigTarget.type === 'cadastros') {
+      const parsed = parseRowsWithConfig(manualConfigTarget.rawRows, CADASTROS_FIELDS, config);
+      setCadastrosConfig(config);
+      setCadastrosRawRows(manualConfigTarget.rawRows);
+      setCadastrosNeedsManualConfig(parsed.needsManualConfig);
+      setCadastrosMissingLabels(parsed.missingLabels);
+      setCadastrosData(parsed.needsManualConfig ? null : parsed.rows);
+      setCadastrosError(parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : null);
+      setManualConfigTarget(null);
+      return;
+    }
+
+    if (manualConfigTarget.type === 'massa-cadastros') {
+      const parsed = parseRowsWithConfig(manualConfigTarget.rawRows, CADASTROS_FIELDS, config);
+      setMassaCadastrosConfig(config);
+      setMassaCadastrosRawRows(manualConfigTarget.rawRows);
+      setMassaCadastrosNeedsManualConfig(parsed.needsManualConfig);
+      setMassaCadastrosMissingLabels(parsed.missingLabels);
+      setMassaCadastrosData(parsed.needsManualConfig ? null : parsed.rows);
+      setMassaCadastrosError(parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : null);
+      setManualConfigTarget(null);
+      return;
+    }
+
+    if (manualConfigTarget.type === 'cash') {
+      const parsed = parseRowsWithConfig(manualConfigTarget.rawRows, CASH_FIELDS, config);
+      setCashGameFiles((prev) => prev.map((file, i) => i === manualConfigTarget.index
+        ? {
+            ...file,
+            config,
+            data: parsed.needsManualConfig ? [] : parsed.rows,
+            needsManualConfig: parsed.needsManualConfig,
+            missingLabels: parsed.missingLabels,
+            error: parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined,
+          }
+        : file));
+      setManualConfigTarget(null);
+      return;
+    }
+
+    if (manualConfigTarget.type === 'torneio') {
+      const parsed = parseRowsWithConfig(manualConfigTarget.rawRows, TORNEIO_FIELDS, config);
+      setTorneioFiles((prev) => prev.map((file, i) => i === manualConfigTarget.index
+        ? {
+            ...file,
+            config,
+            data: parsed.needsManualConfig ? [] : parsed.rows,
+            needsManualConfig: parsed.needsManualConfig,
+            missingLabels: parsed.missingLabels,
+            error: parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined,
+          }
+        : file));
+      setManualConfigTarget(null);
+      return;
+    }
+
+    const parsed = parseRowsWithConfig(manualConfigTarget.rawRows, BAR_FIELDS, config);
+    setBarFiles((prev) => prev.map((file, i) => i === manualConfigTarget.index
+      ? {
+          ...file,
+          config,
+          data: parsed.needsManualConfig ? [] : parsed.rows,
+          needsManualConfig: parsed.needsManualConfig,
+          missingLabels: parsed.missingLabels,
+          error: parsed.needsManualConfig ? missingFieldsMessage(parsed.missingLabels) : undefined,
+        }
+      : file));
+    setManualConfigTarget(null);
   }
 
   async function sendMassMessages() {
@@ -646,8 +972,8 @@ export default function Home() {
 
     const payload = massaCadastrosData
       .map((r) => ({
-        name:  String(findCol(r, NAME_ALIASES)  ?? '').trim(),
-        phone: String(findCol(r, PHONE_ALIASES) ?? '').trim(),
+        name:  String(findMappedCol(r, NAME_ALIASES, 'name', massaCadastrosConfig) ?? '').trim(),
+        phone: String(findMappedCol(r, PHONE_ALIASES, 'phone', massaCadastrosConfig) ?? '').trim(),
       }))
       .filter((c) => c.name && c.phone)
       .map((c) => ({
@@ -742,7 +1068,10 @@ export default function Home() {
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
-  const canMerge        = !!(cadastrosData && (cashGameFiles.length > 0 || torneioFiles.length > 0 || barFiles.length > 0));
+  const hasMergeSourceData = cashGameFiles.some((f) => f.data.length > 0)
+    || torneioFiles.some((f) => f.data.length > 0)
+    || barFiles.some((f) => f.data.length > 0);
+  const canMerge = !!(cadastrosData && hasMergeSourceData);
   const previewContact  = contacts[0];
   const successCount    = results.filter((r) => r.success).length;
   const errorCount      = results.filter((r) => !r.success).length;
@@ -764,10 +1093,20 @@ export default function Home() {
   };
 
   const massaContactCount = massaCadastrosData
-    ? massaCadastrosData.filter((r) => findCol(r, NAME_ALIASES) && findCol(r, PHONE_ALIASES)).length
+    ? massaCadastrosData.filter((r) =>
+      findMappedCol(r, NAME_ALIASES, 'name', massaCadastrosConfig)
+      && findMappedCol(r, PHONE_ALIASES, 'phone', massaCadastrosConfig)).length
     : 0;
   const massaSuccessCount = massaResults.filter((r) => r.success).length;
   const massaErrorCount   = massaResults.filter((r) => !r.success).length;
+  const requiredFieldsForManualTarget: SheetRequirement[] =
+    manualConfigTarget?.type === 'cadastros' || manualConfigTarget?.type === 'massa-cadastros'
+      ? CADASTROS_FIELDS
+      : manualConfigTarget?.type === 'cash'
+        ? CASH_FIELDS
+        : manualConfigTarget?.type === 'torneio'
+          ? TORNEIO_FIELDS
+          : BAR_FIELDS;
 
   // ─── QR Code block (shared) ───────────────────────────────────────────────────
 
@@ -866,6 +1205,20 @@ export default function Home() {
                 onFile={handleMassaCadastros}
               />
             </div>
+            {massaCadastrosNeedsManualConfig && massaCadastrosRawRows && (
+              <div className="max-w-xs p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                <p className="text-xs text-amber-300">
+                  ⚠️ Campos não encontrados: {massaCadastrosMissingLabels.join(', ')}
+                </p>
+                <button
+                  type="button"
+                  onClick={openManualConfigForMassaCadastros}
+                  className="mt-2 text-xs px-2 py-1 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                >
+                  Seleção Manual
+                </button>
+              </div>
+            )}
             {massaCadastrosData && (
               <p className="text-xs text-green-700 font-medium">
                 ✅ {massaContactCount} contato{massaContactCount !== 1 ? 's' : ''} carregado{massaContactCount !== 1 ? 's' : ''}
@@ -991,6 +1344,15 @@ export default function Home() {
             </div>
           )}
         </main>
+        {manualConfigTarget && (
+          <ManualConfigModal
+            fileName={manualConfigTarget.fileName}
+            rawRows={manualConfigTarget.rawRows}
+            requiredFields={requiredFieldsForManualTarget}
+            onCancel={() => setManualConfigTarget(null)}
+            onConfirm={applyManualConfig}
+          />
+        )}
       </div>
     );
   }
@@ -1022,28 +1384,47 @@ export default function Home() {
         <div className="bg-emerald-950/30 rounded-xl shadow-sm border border-emerald-900/30 p-5">
           <h2 className="font-semibold text-slate-100 mb-4">📤 Planilhas</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <UploadZone
-              label="Cadastros"  icon="📋"
-              fileName={cadastrosFile} loaded={!!cadastrosData} error={cadastrosError}
-              required onFile={handleCadastros}
-            />
+            <div className="flex flex-col gap-2">
+              <UploadZone
+                label="Cadastros"  icon="📋"
+                fileName={cadastrosFile} loaded={!!cadastrosData} error={cadastrosError}
+                required onFile={handleCadastros}
+              />
+              {cadastrosNeedsManualConfig && cadastrosRawRows && (
+                <div className="p-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                  <p className="text-xs text-amber-300">
+                    ⚠️ Campos não encontrados: {cadastrosMissingLabels.join(', ')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openManualConfigForCadastros}
+                    className="mt-1 text-xs px-2 py-1 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                  >
+                    Seleção Manual
+                  </button>
+                </div>
+              )}
+            </div>
             <MultiUploadZone
               label="Cash Game"  icon="🎲"
               files={cashGameFiles}
               onAdd={handleAddCashGame}
               onRemove={handleRemoveCashGame}
+              onManualConfig={(index) => handleOpenMultiFileManualConfig('cash', index)}
             />
             <MultiUploadZone
               label="Torneio"  icon="🏆"
               files={torneioFiles}
               onAdd={handleAddTorneio}
               onRemove={handleRemoveTorneio}
+              onManualConfig={(index) => handleOpenMultiFileManualConfig('torneio', index)}
             />
             <MultiUploadZone
               label="Bar"  icon="🍺"
               files={barFiles}
               onAdd={handleAddBar}
               onRemove={handleRemoveBar}
+              onManualConfig={(index) => handleOpenMultiFileManualConfig('bar', index)}
             />
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1419,6 +1800,15 @@ export default function Home() {
         )}
 
       </main>
+      {manualConfigTarget && (
+        <ManualConfigModal
+          fileName={manualConfigTarget.fileName}
+          rawRows={manualConfigTarget.rawRows}
+          requiredFields={requiredFieldsForManualTarget}
+          onCancel={() => setManualConfigTarget(null)}
+          onConfirm={applyManualConfig}
+        />
+      )}
     </div>
   );
 }
