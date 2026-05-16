@@ -225,7 +225,7 @@ export default function ManualConfigModal({
                       }`}
                     >
                       <td className="px-2 py-2 font-semibold text-slate-300">#{rowIndex + 1}</td>
-                      {Array.from({ length: previewColumnCount }).map((__, colIndex) => (
+                      {Array.from({ length: previewColumnCount }).map((_, colIndex) => (
                         <td key={colIndex} className="px-2 py-2 text-slate-200 max-w-[200px] truncate">
                           {cellToText(row[colIndex]) || '—'}
                         </td>
@@ -314,7 +314,7 @@ export default function ManualConfigModal({
                 <tbody>
                   {previewRows.map((row, rowIndex) => (
                     <tr key={rowIndex} className="border-t border-emerald-900/20">
-                      {Array.from({ length: previewColumnCount }).map((__, colIndex) => {
+                      {Array.from({ length: previewColumnCount }).map((_, colIndex) => {
                         const option = columnOptions[colIndex];
                         const fieldKey = option ? fieldByColumn[option.value] : undefined;
                         const styles = fieldKey ? fieldStyles[fieldKey] : undefined;
